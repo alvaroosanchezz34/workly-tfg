@@ -8,6 +8,7 @@ export const createInvoice = async (req, res) => {
         project_id,
         issue_date,
         due_date,
+        status,
         notes,
         items
     } = req.body;
@@ -34,7 +35,7 @@ export const createInvoice = async (req, res) => {
         const [invoiceResult] = await connection.query(
             `INSERT INTO invoices
       (user_id, client_id, project_id, invoice_number, issue_date, due_date, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 req.user.id,
                 client_id,
@@ -42,6 +43,7 @@ export const createInvoice = async (req, res) => {
                 invoiceNumber,
                 issue_date,
                 due_date,
+                status,
                 notes
             ]
         );

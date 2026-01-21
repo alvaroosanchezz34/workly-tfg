@@ -24,7 +24,16 @@ export const getDashboardData = async (req, res) => {
         const [[pendingInvoices]] = await pool.query(
             `SELECT COUNT(*) AS total
        FROM invoices
-       WHERE user_id = ? AND status = 'pending'`,
+       WHERE user_id = ? AND status = 'sent' || 'draft'`,
+            [userId]
+        );
+
+        // Facturas vencidas (overdue)
+        const [[overdueInvoices]] = await pool.query(
+            `SELECT COUNT(*) AS total
+   FROM invoices
+   WHERE user_id = ?
+   AND status = 'overdue'`,
             [userId]
         );
 
@@ -54,6 +63,7 @@ export const getDashboardData = async (req, res) => {
             expenses: expenses.total,
             profit: income.total - expenses.total,
             pendingInvoices: pendingInvoices.total,
+            overdueInvoices: overdueInvoices.total,
             monthlyIncome,
             expensesByCategory
         });
