@@ -27,64 +27,68 @@ const Dashboard = () => {
     }, []);
 
     return (
-        <div style={styles.content}>
-            <h1 style={{ marginBottom: '24px' }}>Dashboard</h1>
+        <div className="bg-slate-50 min-h-screen">
+            <div className="p-6 space-y-8">
+                <h2 className="text-2xl font-semibold text-slate-800">
+                    Resumen general
+                </h2>
 
-            {!data ? (
-                <p>Cargando datos...</p>
-            ) : (
-                <div style={styles.cards}>
-                    <MetricCard
-                        title="Ingresos"
-                        value={`€${data.income}`}
-                        color="#16a34a"
-                    />
+                {!data ? (
+                    <p>Cargando datos...</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <MetricCard
+                            title="Ingresos"
+                            value={`€${data.income}`}
+                            color="#16a34a"
+                        />
 
-                    <MetricCard
-                        title="Gastos"
-                        value={`€${data.expenses}`}
-                        color="#dc2626"
-                    />
+                        <MetricCard
+                            title="Gastos"
+                            value={`€${data.expenses}`}
+                            color="#dc2626"
+                        />
 
-                    <MetricCard
-                        title="Beneficio"
-                        value={`€${data.profit}`}
-                        color={data.profit >= 0 ? '#2563eb' : '#dc2626'}
-                    />
+                        <MetricCard
+                            title="Beneficio"
+                            value={`€${data.profit}`}
+                            color={data.profit >= 0 ? '#2563eb' : '#dc2626'}
+                        />
 
-                    <MetricCard
+                        <MetricCard
+                            title="Facturas pendientes"
+                            value={data.pendingInvoices}
+                            color="#f59e0b"
+                        />
+
+                        <MetricCard
+                            title="Facturas vencidas"
+                            value={data.overdueInvoices}
+                            color="#dc2626"
+                        />
+                    </div>
+                )}
+                {data && data.monthlyIncome && data.monthlyIncome.length > 0 && (
+                    <ChartCard data={data.monthlyIncome} />
+                )}
+                {data.pendingInvoices > 0 && (
+                    <AlertBox
+                        type="warning"
                         title="Facturas pendientes"
-                        value={data.pendingInvoices}
-                        color="#f59e0b"
+                        description={`Tienes ${data.pendingInvoices} factura(s) pendiente(s) de cobro`}
                     />
-
-                    <MetricCard
+                )}
+                {data.overdueInvoices > 0 && (
+                    <AlertBox
+                        type="danger"
                         title="Facturas vencidas"
-                        value={data.overdueInvoices}
-                        color="#dc2626"
+                        description={`Tienes ${data.overdueInvoices} factura(s) vencidas. Requieren atención inmediata`}
                     />
-                </div>
-            )}
-            {data && data.monthlyIncome && data.monthlyIncome.length > 0 && (
-                <ChartCard data={data.monthlyIncome} />
-            )}
-            {data.pendingInvoices > 0 && (
-                <AlertBox
-                    type="warning"
-                    title="Facturas pendientes"
-                    description={`Tienes ${data.pendingInvoices} factura(s) pendiente(s) de cobro`}
-                />
-            )}
-            {data.overdueInvoices > 0 && (
-                <AlertBox
-                    type="danger"
-                    title="Facturas vencidas"
-                    description={`Tienes ${data.overdueInvoices} factura(s) vencidas. Requieren atención inmediata`}
-                />
-            )}
+                )}
 
 
-            <QuickActions />
+                <QuickActions />
+            </div>
         </div>
 
     );

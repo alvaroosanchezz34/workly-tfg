@@ -1,6 +1,6 @@
 const MetricCard = ({ title, value, color }) => {
   return (
-    <div style={{ ...styles.card, borderLeft: `4px solid ${color}` }}>
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
       <p style={styles.title}>{title}</p>
       <h2 style={{ ...styles.value, color }}>{value}</h2>
     </div>

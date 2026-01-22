@@ -1,27 +1,13 @@
-import { useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
-
-const Topbar = () => {
-    const { logout } = useContext(AuthContext);
-
+export default function Topbar() {
     return (
-        <header style={styles.topbar}>
-            <span>Dashboard</span>
-            <button onClick={logout}>Salir</button>
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 justify-between">
+            <span className="text-sm text-slate-500">
+                Dashboard
+            </span>
+
+            <div className="text-sm text-slate-600">
+                Hola 👋
+            </div>
         </header>
-    );
-};
-
-const styles = {
-    topbar: {
-        height: '60px',
-        background: '#ffffff',
-        borderBottom: '1px solid #e5e7eb',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '0 20px',
-    },
-};
-
-export default Topbar;
+    )
+}

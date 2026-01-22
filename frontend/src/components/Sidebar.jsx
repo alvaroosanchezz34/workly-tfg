@@ -1,35 +1,21 @@
-const Sidebar = () => {
+export default function Sidebar() {
     return (
-        <aside style={styles.sidebar}>
-            <h2 style={styles.logo}>WorkLy</h2>
+        <aside className="w-64 bg-white border-r border-slate-200 min-h-screen px-6 py-8">
+            <h1 className="text-xl font-bold text-indigo-600 mb-10">
+                WorkLy
+            </h1>
 
-            <nav style={styles.nav}>
-                <a href="/dashboard">Dashboard</a>
-                <a href="#">Clientes</a>
-                <a href="#">Proyectos</a>
-                <a href="#">Facturas</a>
-                <a href="#">Gastos</a>
+            <nav className="space-y-3 text-sm">
+                <a className="block px-3 py-2 rounded-md bg-indigo-50 text-indigo-600 font-medium">
+                    Dashboard
+                </a>
+                <a className="block px-3 py-2 rounded-md text-slate-600 hover:bg-slate-100">
+                    Facturas
+                </a>
+                <a className="block px-3 py-2 rounded-md text-slate-600 hover:bg-slate-100">
+                    Clientes
+                </a>
             </nav>
         </aside>
-    );
-};
-
-const styles = {
-    sidebar: {
-        width: '220px',
-        height: '100vh',
-        background: '#0f172a',
-        color: '#fff',
-        padding: '20px',
-    },
-    logo: {
-        marginBottom: '40px',
-    },
-    nav: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-    },
-};
-
-export default Sidebar;
+    )
+}
