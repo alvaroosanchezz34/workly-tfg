@@ -25,15 +25,12 @@ const ChartCard = ({ data }) => {
                 data: data.map(item => Number(item.total)),
                 backgroundColor: '#2563eb',
                 borderRadius: 6,
-
-                // 👇 CLAVE PARA EL GROSOR
                 barThickness: 60,
                 maxBarThickness: 70,
                 categoryPercentage: 0.6,
                 barPercentage: 0.7,
             },
         ],
-
     };
 
     const options = {
@@ -54,24 +51,13 @@ const ChartCard = ({ data }) => {
     };
 
     return (
-        <div style={styles.card}>
-            <h3 style={styles.title}>Evolución de ingresos</h3>
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-8">
+            <h3 className="text-lg font-semibold text-slate-800 mb-6">
+                Evolución de ingresos
+            </h3>
             <Bar data={chartData} options={options} />
         </div>
     );
-};
-
-const styles = {
-    card: {
-        marginTop: '32px',
-        background: '#ffffff',
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.05)',
-    },
-    title: {
-        marginBottom: '16px',
-    },
 };
 
 export default ChartCard;

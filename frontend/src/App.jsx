@@ -22,6 +22,7 @@ const App = () => (
             </PrivateRoute>
           }
         />
+        <Route path="/clients" element={<Clients />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>
