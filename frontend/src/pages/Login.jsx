@@ -27,7 +27,7 @@ const Login = () => {
             }
 
             const data = await res.json();
-            login(data.token);
+            login(data.token, data.user);
             navigate('/dashboard');
         } catch (error) {
             alert(error.message);

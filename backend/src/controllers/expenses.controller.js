@@ -1,4 +1,6 @@
+// EXPENSES CONTROLLER
 import { pool } from '../config/db.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 // Crear gasto
 export const createExpense = async (req, res) => {
@@ -12,20 +14,31 @@ export const createExpense = async (req, res) => {
             [req.user.id, category, description, amount, date, receipt_url]
         );
 
+        await logActivity({
+            userId: req.user.id,
+            entity: 'expense',
+            entityId: result.insertId,
+            action: 'created',
+        });
+
         res.status(201).json({
             message: 'Gasto creado',
-            expenseId: result.insertId
+            expenseId: result.insertId,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// Obtener gastos del usuario
+// Obtener gastos del usuario (NO eliminados)
 export const getExpenses = async (req, res) => {
     try {
         const [rows] = await pool.query(
-            'SELECT * FROM expenses WHERE user_id = ? ORDER BY date DESC',
+            `SELECT *
+       FROM expenses
+       WHERE user_id = ?
+       AND is_deleted = 0
+       ORDER BY date DESC`,
             [req.user.id]
         );
 
@@ -35,13 +48,17 @@ export const getExpenses = async (req, res) => {
     }
 };
 
-// Obtener gasto por ID
+// Obtener gasto por ID (NO eliminado)
 export const getExpenseById = async (req, res) => {
     const { id } = req.params;
 
     try {
         const [rows] = await pool.query(
-            'SELECT * FROM expenses WHERE id = ? AND user_id = ?',
+            `SELECT *
+       FROM expenses
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
             [id, req.user.id]
         );
 
@@ -55,18 +72,31 @@ export const getExpenseById = async (req, res) => {
     }
 };
 
-// Actualizar gasto
+// Actualizar gasto (solo si NO está eliminado)
 export const updateExpense = async (req, res) => {
     const { id } = req.params;
     const { category, description, amount, date, receipt_url } = req.body;
 
     try {
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE expenses
        SET category = ?, description = ?, amount = ?, date = ?, receipt_url = ?
-       WHERE id = ? AND user_id = ?`,
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
             [category, description, amount, date, receipt_url, id, req.user.id]
         );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Gasto no encontrado' });
+        }
+
+        await logActivity({
+            userId: req.user.id,
+            entity: 'expense',
+            entityId: id,
+            action: 'updated',
+        });
 
         res.json({ message: 'Gasto actualizado' });
     } catch (error) {
@@ -74,17 +104,34 @@ export const updateExpense = async (req, res) => {
     }
 };
 
-// Eliminar gasto
+// Eliminar gasto (SOFT DELETE)
 export const deleteExpense = async (req, res) => {
     const { id } = req.params;
 
     try {
-        await pool.query(
-            'DELETE FROM expenses WHERE id = ? AND user_id = ?',
-            [id, req.user.id]
+        const [result] = await pool.query(
+            `UPDATE expenses
+       SET is_deleted = 1,
+           deleted_at = NOW(),
+           deleted_by = ?
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
+            [req.user.id, id, req.user.id]
         );
 
-        res.json({ message: 'Gasto eliminado' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Gasto no encontrado' });
+        }
+
+        await logActivity({
+            userId: req.user.id,
+            entity: 'expense',
+            entityId: id,
+            action: 'deleted',
+        });
+
+        res.json({ message: 'Gasto eliminado correctamente' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

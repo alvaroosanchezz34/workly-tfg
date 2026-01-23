@@ -6,6 +6,7 @@ import projectsRoutes from './routes/projects.routes.js';
 import invoicesRoutes from './routes/invoices.routes.js';
 import expensesRoutes from './routes/expenses.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import activityLogsRoutes from './routes/activityLogs.routes.js';
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api/invoices', invoicesRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/activity-logs', activityLogsRoutes);
 
 app.get('/api/health', async (req, res) => {
   res.json({ status: 'OK', database: 'connected' });

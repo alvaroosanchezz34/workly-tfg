@@ -10,10 +10,25 @@ CREATE TABLE users (
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
+
+  avatar_url VARCHAR(255),
+  phone VARCHAR(50),
+  company_name VARCHAR(150),
+
   role ENUM('user', 'admin') DEFAULT 'user',
+  status ENUM('active','inactive','suspended') DEFAULT 'active',
+
+  language VARCHAR(10) DEFAULT 'es',
+  timezone VARCHAR(50) DEFAULT 'Europe/Madrid',
+
+  last_login DATETIME,
+  plan ENUM('free','pro','business') DEFAULT 'free',
+  trial_ends_at DATETIME,
+
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE activity_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,

@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 // Crear factura
 export const createInvoice = async (req, res) => {
@@ -10,7 +11,7 @@ export const createInvoice = async (req, res) => {
         due_date,
         status,
         notes,
-        items
+        items,
     } = req.body;
 
     const connection = await pool.getConnection();
@@ -18,9 +19,13 @@ export const createInvoice = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // comprobar cliente del usuario
+        // comprobar cliente del usuario y NO eliminado
         const [client] = await connection.query(
-            'SELECT id FROM clients WHERE id = ? AND user_id = ?',
+            `SELECT id
+       FROM clients
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
             [client_id, req.user.id]
         );
 
@@ -28,14 +33,14 @@ export const createInvoice = async (req, res) => {
             throw new Error('Cliente no válido');
         }
 
-        // generar número de factura simple
+        // generar número de factura
         const invoiceNumber = `INV-${Date.now()}`;
 
         // crear factura
         const [invoiceResult] = await connection.query(
             `INSERT INTO invoices
-      (user_id, client_id, project_id, invoice_number, issue_date, due_date, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (user_id, client_id, project_id, invoice_number, issue_date, due_date, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 req.user.id,
                 client_id,
@@ -43,8 +48,8 @@ export const createInvoice = async (req, res) => {
                 invoiceNumber,
                 issue_date,
                 due_date,
-                status,
-                notes
+                status || 'draft',
+                notes,
             ]
         );
 
@@ -58,14 +63,14 @@ export const createInvoice = async (req, res) => {
 
             await connection.query(
                 `INSERT INTO invoice_items
-        (invoice_id, description, quantity, unit_price, total)
-        VALUES (?, ?, ?, ?, ?)`,
+         (invoice_id, description, quantity, unit_price, total)
+         VALUES (?, ?, ?, ?, ?)`,
                 [
                     invoiceId,
                     item.description,
                     item.quantity,
                     item.unit_price,
-                    lineTotal
+                    lineTotal,
                 ]
             );
         }
@@ -76,13 +81,20 @@ export const createInvoice = async (req, res) => {
             [totalAmount, invoiceId]
         );
 
+        await logActivity({
+            userId: req.user.id,
+            entity: 'invoice',
+            entityId: invoiceId,
+            action: 'created',
+        });
+
         await connection.commit();
 
         res.status(201).json({
             message: 'Factura creada',
             invoiceId,
             invoice_number: invoiceNumber,
-            total: totalAmount
+            total: totalAmount,
         });
     } catch (error) {
         await connection.rollback();
@@ -92,7 +104,7 @@ export const createInvoice = async (req, res) => {
     }
 };
 
-// List invoice from a client
+// Obtener facturas (NO eliminadas)
 export const getInvoices = async (req, res) => {
     try {
         const [rows] = await pool.query(
@@ -100,6 +112,8 @@ export const getInvoices = async (req, res) => {
        FROM invoices i
        JOIN clients c ON i.client_id = c.id
        WHERE i.user_id = ?
+       AND i.is_deleted = 0
+       AND c.is_deleted = 0
        ORDER BY i.created_at DESC`,
             [req.user.id]
         );
@@ -110,13 +124,17 @@ export const getInvoices = async (req, res) => {
     }
 };
 
-// Get invoice with lines
+// Obtener factura por ID (con líneas NO eliminadas)
 export const getInvoiceById = async (req, res) => {
     const { id } = req.params;
 
     try {
         const [[invoice]] = await pool.query(
-            'SELECT * FROM invoices WHERE id = ? AND user_id = ?',
+            `SELECT *
+       FROM invoices
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
             [id, req.user.id]
         );
 
@@ -125,7 +143,10 @@ export const getInvoiceById = async (req, res) => {
         }
 
         const [items] = await pool.query(
-            'SELECT * FROM invoice_items WHERE invoice_id = ?',
+            `SELECT *
+       FROM invoice_items
+       WHERE invoice_id = ?
+       AND is_deleted = 0`,
             [id]
         );
 
@@ -135,38 +156,48 @@ export const getInvoiceById = async (req, res) => {
     }
 };
 
-// Download PDF from invoice
+// Descargar PDF (solo si NO está eliminada)
 export const downloadInvoicePDF = async (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  try {
-    const [[invoice]] = await pool.query(
-      'SELECT * FROM invoices WHERE id = ? AND user_id = ?',
-      [id, req.user.id]
-    );
+    try {
+        const [[invoice]] = await pool.query(
+            `SELECT *
+       FROM invoices
+       WHERE id = ?
+       AND user_id = ?
+       AND is_deleted = 0`,
+            [id, req.user.id]
+        );
 
-    if (!invoice) {
-      return res.status(404).json({ message: 'Factura no encontrada' });
+        if (!invoice) {
+            return res.status(404).json({ message: 'Factura no encontrada' });
+        }
+
+        const [items] = await pool.query(
+            `SELECT *
+       FROM invoice_items
+       WHERE invoice_id = ?
+       AND is_deleted = 0`,
+            [id]
+        );
+
+        const [[client]] = await pool.query(
+            `SELECT name, email
+       FROM clients
+       WHERE id = ?
+       AND is_deleted = 0`,
+            [invoice.client_id]
+        );
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename=factura-${invoice.invoice_number}.pdf`
+        );
+        res.setHeader('Content-Type', 'application/pdf');
+
+        generateInvoicePDF(invoice, items, client, res);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
-
-    const [items] = await pool.query(
-      'SELECT * FROM invoice_items WHERE invoice_id = ?',
-      [id]
-    );
-
-    const [[client]] = await pool.query(
-      'SELECT name, email FROM clients WHERE id = ?',
-      [invoice.client_id]
-    );
-
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=factura-${invoice.invoice_number}.pdf`
-    );
-    res.setHeader('Content-Type', 'application/pdf');
-
-    generateInvoicePDF(invoice, items, client, res);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };

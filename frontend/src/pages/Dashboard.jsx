@@ -3,7 +3,6 @@ import { AuthContext } from '../context/AuthContext';
 import { getDashboard } from '../api/dashboard';
 
 import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
 import MetricCard from '../components/MetricCard';
 import ChartCard from '../components/ChartCard';
 import AlertBox from '../components/AlertBox';

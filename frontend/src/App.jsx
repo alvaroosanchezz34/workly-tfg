@@ -3,6 +3,10 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/DashBoard';
 import { useContext } from 'react';
+import Clients from './pages/Clients';
+import Profile from './pages/Profile';
+import ActivityLogs from './pages/ActivityLogs';
+import DeletedClients from './pages/DeletedClients';
 
 const PrivateRoute = ({ children }) => {
   const { token } = useContext(AuthContext);
@@ -23,6 +27,16 @@ const App = () => (
           }
         />
         <Route path="/clients" element={<Clients />} />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/activity" element={<ActivityLogs />} />
+        <Route path="/clients/deleted" element={<DeletedClients />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>
