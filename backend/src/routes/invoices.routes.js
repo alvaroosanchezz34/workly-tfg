@@ -15,7 +15,7 @@ router.post('/', authenticate, createInvoice);
 router.get('/', authenticate, getInvoices);
 router.get('/:id', authenticate, getInvoiceById);
 router.get('/:id/pdf', authenticate, downloadInvoicePDF);
-router.put('/:id', authenticate, updateInvoice); 
+router.put("/:id", authenticate, updateInvoice);
 router.delete('/:id', authenticate, softDeleteInvoice);
 
 export default router;

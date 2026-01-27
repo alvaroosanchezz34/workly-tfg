@@ -53,15 +53,18 @@ export const downloadInvoicePDF = async (token, id) => {
 };
 
 export const updateInvoice = async (token, id, data) => {
-    const res = await fetch(`${API_URL}/${id}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-    });
+    const res = await fetch(
+        `${API_URL}/${id}`,
+        {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        }
+    );
 
-    if (!res.ok) throw new Error('Error al actualizar factura');
+    if (!res.ok) throw new Error("Error al actualizar factura");
     return res.json();
 };
