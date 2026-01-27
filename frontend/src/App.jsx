@@ -7,6 +7,10 @@ import Clients from './pages/Clients';
 import Profile from './pages/Profile';
 import ActivityLogs from './pages/ActivityLogs';
 import DeletedClients from './pages/DeletedClients';
+import Services from './pages/Services';
+import Expenses from './pages/Expenses';
+import Projects from './pages/Projects';
+import Invoices from './pages/Invoices';
 
 const PrivateRoute = ({ children }) => {
   const { token } = useContext(AuthContext);
@@ -37,6 +41,10 @@ const App = () => (
         />
         <Route path="/activity" element={<ActivityLogs />} />
         <Route path="/clients/deleted" element={<DeletedClients />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/expenses" element={<Expenses />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/invoices" element={<Invoices />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>
