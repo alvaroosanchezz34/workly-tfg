@@ -88,12 +88,17 @@ export default function Invoices() {
                                     <td className="p-3 font-medium">{i.invoice_number}</td>
                                     <td className="p-3">{i.client_name}</td>
                                     <td className="p-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium
-              ${i.status === 'draft' ? 'bg-yellow-100 text-yellow-700' : ''}
-              ${i.status === 'paid' ? 'bg-green-100 text-green-700' : ''}
-            `}>
+                                        <span
+                                            className={`px-2 py-1 rounded text-xs font-medium
+        ${i.status === 'draft' && 'bg-gray-100 text-gray-600'}
+        ${i.status === 'sent' && 'bg-blue-100 text-blue-700'}
+        ${i.status === 'paid' && 'bg-green-100 text-green-700'}
+        ${i.status === 'overdue' && 'bg-red-100 text-red-700'}
+    `}
+                                        >
                                             {i.status}
                                         </span>
+
                                     </td>
                                     <td className="p-3 font-semibold">€{i.total_amount}</td>
                                     <td className="p-3 text-right space-x-3">

@@ -124,6 +124,18 @@ export const createInvoice = async (req, res) => {
 
 // Get facturas
 export const getInvoices = async (req, res) => {
+    await pool.query(
+        `
+    UPDATE invoices
+    SET status = 'overdue'
+    WHERE user_id = ?
+      AND status IN ('draft', 'sent')
+      AND due_date < CURDATE()
+      AND is_deleted = 0
+    `,
+        [req.user.id]
+    );
+
     try {
         const [rows] = await pool.query(
             `
@@ -338,6 +350,18 @@ export const updateInvoice = async (req, res) => {
         if (!invoice) {
             return res.status(404).json({ message: "Factura no encontrada" });
         }
+
+        const [[current]] = await conn.query(
+            `SELECT status FROM invoices WHERE id = ?`,
+            [id]
+        );
+
+        if (current.status === "paid") {
+            return res
+                .status(400)
+                .json({ message: "No se puede modificar una factura pagada" });
+        }
+
 
         // 2️⃣ Actualizar cabecera
         await conn.query(
