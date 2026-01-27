@@ -84,3 +84,29 @@ export const login = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const refreshToken = async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(401).json({ message: "Refresh token requerido" });
+    }
+
+    try {
+        const decoded = jwt.verify(
+            refreshToken,
+            process.env.JWT_REFRESH_SECRET
+        );
+
+        const newAccessToken = jwt.sign(
+            { id: decoded.id },
+            process.env.JWT_SECRET,
+            { expiresIn: "30m" }
+        );
+
+        res.json({ accessToken: newAccessToken });
+
+    } catch (error) {
+        return res.status(403).json({ message: "Refresh token inválido" });
+    }
+};

@@ -74,6 +74,35 @@ export const AuthProvider = ({ children }) => {
         return () => window.removeEventListener("storage", handleStorageChange);
     }, [token]);
 
+    const refreshAccessToken = async () => {
+        try {
+            const refreshToken = localStorage.getItem("refreshToken");
+            if (!refreshToken) throw new Error("No refresh token");
+
+            const res = await fetch(
+                `${import.meta.env.VITE_API_URL}/auth/refresh`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refreshToken }),
+                }
+            );
+
+            if (!res.ok) throw new Error("Refresh failed");
+
+            const data = await res.json();
+
+            setToken(data.accessToken);
+            localStorage.setItem("token", data.accessToken);
+            localStorage.setItem("loginTime", Date.now());
+
+            return data.accessToken;
+        } catch (err) {
+            logout();
+            return null;
+        }
+    };
+
     const login = (accessToken, refreshToken, userData) => {
         setToken(accessToken);
         setUser(userData);
@@ -111,11 +140,15 @@ export const AuthProvider = ({ children }) => {
 
                     <div className="flex gap-3">
                         <button
-                            onClick={extendSession}
+                            onClick={async () => {
+                                await refreshAccessToken();
+                                setSessionWarning(null);
+                            }}
                             className="px-3 py-1 bg-yellow-500 text-white rounded"
                         >
                             Seguir conectado
                         </button>
+
 
 
                         <button
