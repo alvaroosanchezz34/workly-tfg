@@ -1,52 +1,37 @@
 import { useState } from 'react';
+import { Input, Select, FormFooter } from './FormComponents';
+
+const UNITS = [
+    { value:'hora',     label:'Hora' },
+    { value:'dia',      label:'Día' },
+    { value:'proyecto', label:'Proyecto' },
+    { value:'pagina',   label:'Página' },
+    { value:'unidad',   label:'Unidad' },
+    { value:'mes',      label:'Mes' },
+];
 
 export default function ServiceForm({ initialData, onSubmit, onCancel }) {
-    const data = initialData || {};
-
+    const d = initialData || {};
     const [form, setForm] = useState({
-        name: data.name || '',
-        default_rate: data.default_rate || '',
-        unit: data.unit || '',
+        name:         d.name         || '',
+        default_rate: d.default_rate || '',
+        unit:         d.unit         || '',
     });
-
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = (e) => {
+    const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    const handleSubmit = e => {
         e.preventDefault();
-        if (!form.name.trim()) {
-            alert('El nombre es obligatorio');
-            return;
-        }
+        if (!form.name.trim()) return alert('El nombre es obligatorio');
         onSubmit(form);
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Nombre" name="name" value={form.name} onChange={handleChange} />
-            <Input label="Tarifa por defecto (€)" name="default_rate" value={form.default_rate} onChange={handleChange} />
-            <Input label="Unidad (hora, servicio, etc.)" name="unit" value={form.unit} onChange={handleChange} />
-
-            <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 border rounded-lg">
-                    Cancelar
-                </button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
-                    Guardar
-                </button>
+        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:13 }}>
+            <Input label="Nombre del servicio" name="name" value={form.name} onChange={set} required placeholder="Ej: Desarrollo web, Diseño gráfico…" />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <Input label="Tarifa por defecto (€)" name="default_rate" type="number" min="0" step="0.01" value={form.default_rate} onChange={set} placeholder="0.00" />
+                <Select label="Unidad" name="unit" value={form.unit} onChange={set} placeholder="Selecciona…" options={UNITS} />
             </div>
+            <FormFooter onCancel={onCancel} />
         </form>
     );
 }
-
-/* AUX */
-const Input = ({ label, ...props }) => (
-    <div>
-        <label className="block text-sm mb-1">{label}</label>
-        <input
-            {...props}
-            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500"
-        />
-    </div>
-);

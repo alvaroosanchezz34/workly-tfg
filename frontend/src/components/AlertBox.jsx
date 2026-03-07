@@ -1,39 +1,20 @@
-import { AlertTriangle, XCircle, Info } from "lucide-react";
+import { AlertTriangle, XCircle, CheckCircle, Info } from 'lucide-react';
+
+const MAP = {
+    warning: { cls: 'alert-warning', icon: <AlertTriangle size={15}/> },
+    danger:  { cls: 'alert-danger',  icon: <XCircle size={15}/> },
+    success: { cls: 'alert-success', icon: <CheckCircle size={15}/> },
+    info:    { cls: 'alert-info',    icon: <Info size={15}/> },
+};
 
 const AlertBox = ({ type, title, description }) => {
-    const variants = {
-        warning: {
-            bg: "bg-orange-50",
-            border: "border-orange-400",
-            icon: <AlertTriangle className="text-orange-500" size={18} />,
-        },
-        danger: {
-            bg: "bg-red-50",
-            border: "border-red-500",
-            icon: <XCircle className="text-red-500" size={18} />,
-        },
-        info: {
-            bg: "bg-blue-50",
-            border: "border-blue-400",
-            icon: <Info className="text-blue-500" size={18} />,
-        },
-    };
-
-    const current = variants[type] || variants.info;
-
+    const { cls, icon } = MAP[type] || MAP.info;
     return (
-        <div
-            className={`flex items-start gap-4 ${current.bg} border-l-4 ${current.border} rounded-xl p-5`}
-        >
-            <div className="mt-0.5">{current.icon}</div>
-
+        <div className={`alert ${cls}`}>
+            <div style={{ flexShrink:0, marginTop:1 }}>{icon}</div>
             <div>
-                <p className="font-medium text-slate-800">
-                    {title}
-                </p>
-                <p className="text-sm text-slate-600 mt-1">
-                    {description}
-                </p>
+                <p style={{ fontWeight:600, marginBottom:2 }}>{title}</p>
+                {description && <p style={{ opacity:.85, fontSize:13 }}>{description}</p>}
             </div>
         </div>
     );

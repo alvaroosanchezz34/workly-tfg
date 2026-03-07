@@ -1,135 +1,137 @@
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getDashboard } from '../api/dashboard';
-
 import Sidebar from '../components/Sidebar';
 import MetricCard from '../components/MetricCard';
 import ChartCard from '../components/ChartCard';
 import AlertBox from '../components/AlertBox';
 import QuickActions from '../components/QuickActions';
+import { TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle } from 'lucide-react';
+
+const fmt = v => new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR' }).format(v ?? 0);
+
+const STATUS_META = {
+    pending:     { label:'Pendiente',   cls:'badge badge-pending' },
+    in_progress: { label:'En progreso', cls:'badge badge-in_progress' },
+    completed:   { label:'Completado',  cls:'badge badge-completed' },
+    cancelled:   { label:'Cancelado',   cls:'badge badge-cancelled' },
+};
+
+const SkeletonRow = () => (
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:24 }}>
+        {[...Array(5)].map((_,i) => (
+            <div key={i} className="metric-card" style={{ height:96 }}>
+                <div className="skeleton" style={{ height:11, width:'45%', marginBottom:14 }} />
+                <div className="skeleton" style={{ height:24, width:'60%' }} />
+            </div>
+        ))}
+    </div>
+);
 
 const Dashboard = () => {
-    const { token } = useContext(AuthContext);
-
-    const [data, setData] = useState({
-        income: 0,
-        expenses: 0,
-        profit: 0,
-        pendingInvoices: 0,
-        overdueInvoices: 0,
-        monthlyIncome: [],
-        expensesByCategory: [],
-    });
-
+    const { token, user } = useContext(AuthContext);
+    const [data,    setData]    = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!token) return;
-
-        getDashboard(token)
-            .then(setData)
-            .finally(() => setLoading(false));
+        getDashboard(token).then(setData).finally(() => setLoading(false));
     }, [token]);
 
-    if (loading) {
-        return (
-            <div className="flex min-h-screen">
-                <Sidebar />
-                <div className="flex-1">
-                    <main className="ml-64 min-h-screen p-8 space-y-12">
-                        <div className="p-6">
-                            <p className="text-slate-500">Cargando datos del dashboard...</p>
-                        </div>
-                    </main>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="flex min-h-screen bg-slate-50">
-            {/* Sidebar */}
+        <div className="app-layout">
             <Sidebar />
+            <main className="page-content">
 
-            {/* Contenido principal */}
-            <div className="flex-1 flex flex-col">
+                {/* HEADER */}
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">
+                            Hola, {user?.name?.split(' ')[0] || 'de vuelta'} 👋
+                        </h1>
+                        <p className="page-subtitle">
+                            {new Date().toLocaleDateString('es-ES', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+                        </p>
+                    </div>
+                </div>
 
-                <main className="ml-64 min-h-screen p-8 space-y-12">
-                    <section className="space-y-4">
-                        {/* TÍTULO */}
-                        <h2 className="text-2xl font-semibold text-slate-800">
-                            Resumen general
-                        </h2>
+                {loading ? <SkeletonRow /> : (
+                    <>
+                        {/* ALERTAS */}
+                        {(data?.overdueInvoices > 0 || data?.pendingInvoices > 0) && (
+                            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+                                {data.overdueInvoices > 0 && (
+                                    <AlertBox type="danger" title="Facturas vencidas"
+                                        description={`Tienes ${data.overdueInvoices} factura(s) vencida(s) sin cobrar.`} />
+                                )}
+                                {data.pendingInvoices > 0 && (
+                                    <AlertBox type="warning" title="Facturas pendientes"
+                                        description={`${data.pendingInvoices} factura(s) pendientes de cobro.`} />
+                                )}
+                            </div>
+                        )}
 
                         {/* MÉTRICAS */}
-                        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <MetricCard
-                                title="Ingresos"
-                                value={`€${data.income}`}
-                                color="#16a34a"
-                            />
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:24 }}>
+                            <MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} />
+                            <MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} />
+                            <MetricCard title="Beneficio neto"    value={fmt(data?.profit)}    accentColor={(data?.profit ?? 0) >= 0 ? '#1976D2' : '#F44336'} icon={<DollarSign size={16}/>} />
+                            <MetricCard title="Fact. pendientes"  value={data?.pendingInvoices ?? 0}  accentColor="#FF9800" icon={<Clock size={16}/>} />
+                            <MetricCard title="Fact. vencidas"    value={data?.overdueInvoices ?? 0}  accentColor="#F44336" icon={<AlertCircle size={16}/>} />
+                        </div>
 
-                            <MetricCard
-                                title="Gastos"
-                                value={`€${data.expenses}`}
-                                color="#dc2626"
-                            />
+                        {/* GRÁFICA + TOP CLIENTES */}
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:18, marginBottom:18 }}>
+                            {data?.monthlyIncome?.length > 0
+                                ? <ChartCard data={data.monthlyIncome} />
+                                : (
+                                    <div className="card card-p" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:200 }}>
+                                        <p style={{ color:'var(--text-disabled)', fontSize:13 }}>Sin datos de ingresos todavía</p>
+                                    </div>
+                                )
+                            }
 
-                            <MetricCard
-                                title="Beneficio"
-                                value={`€${data.profit}`}
-                                color={data.profit >= 0 ? '#2563eb' : '#dc2626'}
-                            />
+                            {data?.topClients?.length > 0 && (
+                                <div className="card card-p">
+                                    <h3 style={{ fontSize:13.5, fontWeight:600, marginBottom:14, color:'var(--text-primary)' }}>
+                                        Top clientes
+                                    </h3>
+                                    {data.topClients.map((c, i) => (
+                                        <div key={c.name} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < data.topClients.length-1 ? '1px solid #F5F5F5' : 'none' }}>
+                                            <div style={{ width:26, height:26, borderRadius:6, background:['var(--primary-light)','var(--secondary-light)','var(--warning-light)'][i], color:['var(--primary)','var(--secondary)','var(--warning)'][i], display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
+                                                {i+1}
+                                            </div>
+                                            <div style={{ flex:1, fontSize:13, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.name}</div>
+                                            <div style={{ fontSize:13, fontWeight:600, color:'var(--secondary)', flexShrink:0 }}>{fmt(c.total)}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                            <MetricCard
-                                title="Facturas pendientes"
-                                value={data.pendingInvoices}
-                                color="#f59e0b"
-                            />
-
-                            <MetricCard
-                                title="Facturas vencidas"
-                                value={data.overdueInvoices}
-                                color="#dc2626"
-                            />
-                        </section>
-                    </section>
-
-                    {/* ALERTAS */}
-                    <section className="space-y-4">
-                        {data.pendingInvoices > 0 && (
-                            <AlertBox
-                                type="warning"
-                                title="Facturas pendientes"
-                                description={`Tienes ${data.pendingInvoices} factura(s) pendiente(s) de cobro`}
-                            />
-                        )}
-
-                        {data.overdueInvoices > 0 && (
-                            <AlertBox
-                                type="danger"
-                                title="Facturas vencidas"
-                                description={`Tienes ${data.overdueInvoices} factura(s) vencida(s). Requieren atención inmediata`}
-                            />
-                        )}
-                    </section>
-
-                    {/* GRÁFICA */}
-                    <section className="mt-12">
-                        {data.monthlyIncome?.length > 0 && (
-                            <section className="mt-12 max-w-5xl">
-                                <ChartCard data={data.monthlyIncome} />
-                            </section>
-                        )}
-                    </section>
-
-
-                    {/* ACCIONES RÁPIDAS */}
-                    <section>
-                        <QuickActions />
-                    </section>
-                </main>
-            </div>
+                        {/* PROYECTOS POR ESTADO + ACCIONES RÁPIDAS */}
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+                            {data?.projectsByStatus?.length > 0 && (
+                                <div className="card card-p">
+                                    <h3 style={{ fontSize:13.5, fontWeight:600, marginBottom:14, color:'var(--text-primary)' }}>
+                                        Proyectos por estado
+                                    </h3>
+                                    {data.projectsByStatus.map(p => {
+                                        const meta = STATUS_META[p.status] || { label:p.status, cls:'badge' };
+                                        return (
+                                            <div key={p.status} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #F9F9F9' }}>
+                                                <span className={meta.cls}><span className="badge-dot"/>{meta.label}</span>
+                                                <span style={{ fontSize:18, fontWeight:700, color:'var(--text-primary)' }}>{p.total}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <QuickActions />
+                        </div>
+                    </>
+                )}
+            </main>
         </div>
     );
 };

@@ -2,169 +2,180 @@ import { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { updateProfile } from '../api/users';
 import Sidebar from '../components/Sidebar';
+import { Input, Select, FormFooter } from '../components/FormComponents';
+import { CheckCircle, Camera } from 'lucide-react';
 
 const Profile = () => {
     const { token, user, login } = useContext(AuthContext);
 
     const [form, setForm] = useState({
-        name: user?.name || '',
-        email: user?.email || '',
-        phone: user?.phone || '',
+        name:         user?.name         || '',
+        email:        user?.email        || '',
+        phone:        user?.phone        || '',
         company_name: user?.company_name || '',
-        avatar_url: user?.avatar_url || '',
-        language: user?.language || 'es',
-        timezone: user?.timezone || 'Europe/Madrid',
+        avatar_url:   user?.avatar_url   || '',
+        language:     user?.language     || 'es',
+        timezone:     user?.timezone     || 'Europe/Madrid',
+        password:     '',
     });
 
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [error,   setError]   = useState('');
 
-    const handleChange = (e) => {
-        setForm({
-            ...form,
-            [e.target.name]: e.target.value,
-        });
-    };
+    const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setSuccess(false);
-
+        setLoading(true); setSuccess(false); setError('');
         try {
-            const updatedUser = await updateProfile(token, form);
-
-            // 🔑 actualizar contexto + localStorage
-            login(token, updatedUser);
-
+            const updated = await updateProfile(token, form);
+            login(token, localStorage.getItem('refreshToken'), updated);
             setSuccess(true);
-        } catch (error) {
-            alert(error.message);
+            setTimeout(() => setSuccess(false), 3500);
+        } catch (err) {
+            setError(err.message || 'Error al guardar los cambios');
         } finally {
             setLoading(false);
         }
     };
 
+    const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U';
+
     return (
-        <div className="bg-slate-50 min-h-screen">
+        <div className="app-layout">
             <Sidebar />
+            <main className="page-content">
 
-            <main className="ml-64 p-8 max-w-3xl">
-                <h2 className="text-2xl font-semibold text-slate-800 mb-6">
-                    Perfil de usuario
-                </h2>
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Mi perfil</h1>
+                        <p className="page-subtitle">Gestiona tu información personal y preferencias de cuenta</p>
+                    </div>
+                </div>
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="bg-white border border-slate-200 rounded-xl p-6 space-y-5"
-                >
-                    {success && (
-                        <p className="text-green-600 text-sm">
-                            Perfil actualizado correctamente
-                        </p>
-                    )}
+                <div style={{ maxWidth: 660 }}>
 
-                    <Input
-                        label="Nombre"
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                    />
+                    {/* ── AVATAR CARD ── */}
+                    <div className="card card-p" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 18 }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <div style={{
+                                width: 64, height: 64,
+                                borderRadius: 14,
+                                background: 'linear-gradient(135deg, var(--primary), var(--warning))',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 22, fontWeight: 700, color: '#fff',
+                                overflow: 'hidden',
+                            }}>
+                                {form.avatar_url
+                                    ? <img src={form.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    : initials
+                                }
+                            </div>
+                            <div style={{
+                                position: 'absolute', bottom: -4, right: -4,
+                                width: 22, height: 22, borderRadius: '50%',
+                                background: 'var(--primary)', border: '2px solid #fff',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Camera size={10} color="#fff" />
+                            </div>
+                        </div>
 
-                    <Input
-                        label="Email"
-                        name="email"
-                        value={form.email}
-                        onChange={handleChange}
-                    />
-
-                    <Input
-                        label="Teléfono"
-                        name="phone"
-                        value={form.phone}
-                        onChange={handleChange}
-                    />
-
-                    <Input
-                        label="Empresa"
-                        name="company_name"
-                        value={form.company_name}
-                        onChange={handleChange}
-                    />
-
-                    <Input
-                        label="Avatar (URL)"
-                        name="avatar_url"
-                        value={form.avatar_url}
-                        onChange={handleChange}
-                    />
-
-                    <div className="flex gap-4">
-                        <Select
-                            label="Idioma"
-                            name="language"
-                            value={form.language}
-                            onChange={handleChange}
-                            options={[
-                                { value: 'es', label: 'Español' },
-                                { value: 'en', label: 'English' },
-                            ]}
-                        />
-
-                        <Select
-                            label="Zona horaria"
-                            name="timezone"
-                            value={form.timezone}
-                            onChange={handleChange}
-                            options={[
-                                { value: 'Europe/Madrid', label: 'Europe/Madrid' },
-                                { value: 'Europe/London', label: 'Europe/London' },
-                            ]}
-                        />
+                        <div>
+                            <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {user?.name || 'Usuario'}
+                            </h2>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{user?.email}</p>
+                            {user?.role === 'admin' && (
+                                <span className="badge badge-sent" style={{ marginTop: 6, display: 'inline-flex' }}>
+                                    Administrador
+                                </span>
+                            )}
+                        </div>
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg transition"
-                    >
-                        {loading ? 'Guardando...' : 'Guardar cambios'}
-                    </button>
-                </form>
+                    {/* ── FORM CARD ── */}
+                    <div className="card card-p">
+                        {success && (
+                            <div className="alert alert-success" style={{ marginBottom: 20 }}>
+                                <CheckCircle size={15} />
+                                <div>
+                                    <strong>Perfil actualizado</strong>
+                                    <p style={{ fontSize: 12.5, marginTop: 1 }}>Los cambios se han guardado correctamente.</p>
+                                </div>
+                            </div>
+                        )}
+                        {error && (
+                            <div className="alert alert-danger" style={{ marginBottom: 20 }}>
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+                            {/* Sección: Datos personales */}
+                            <h3 style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
+                                Datos personales
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                                <Input label="Nombre completo" name="name" value={form.name} onChange={set} required placeholder="Tu nombre" />
+                                <Input label="Email" name="email" type="email" value={form.email} onChange={set} required placeholder="email@ejemplo.com" />
+                                <Input label="Teléfono" name="phone" value={form.phone} onChange={set} placeholder="+34 600 000 000" />
+                                <Input label="Empresa" name="company_name" value={form.company_name} onChange={set} placeholder="Nombre de tu empresa" />
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <Input label="URL del avatar" name="avatar_url" value={form.avatar_url} onChange={set} placeholder="https://ejemplo.com/foto.jpg" />
+                                </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 20px' }} />
+
+                            {/* Sección: Preferencias */}
+                            <h3 style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
+                                Preferencias
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                                <Select label="Idioma" name="language" value={form.language} onChange={set}
+                                    options={[
+                                        { value: 'es', label: 'Español' },
+                                        { value: 'en', label: 'English' },
+                                    ]}
+                                />
+                                <Select label="Zona horaria" name="timezone" value={form.timezone} onChange={set}
+                                    options={[
+                                        { value: 'Europe/Madrid',    label: 'Europe/Madrid (UTC+1/+2)' },
+                                        { value: 'Europe/London',    label: 'Europe/London (UTC+0/+1)' },
+                                        { value: 'America/New_York', label: 'America/New_York (UTC−5/−4)' },
+                                    ]}
+                                />
+                            </div>
+
+                            {/* Divider */}
+                            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 20px' }} />
+
+                            {/* Sección: Seguridad */}
+                            <h3 style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
+                                Cambiar contraseña
+                            </h3>
+                            <Input
+                                label="Nueva contraseña (dejar vacío para no cambiar)"
+                                name="password" type="password"
+                                value={form.password} onChange={set}
+                                placeholder="Mínimo 8 caracteres"
+                            />
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 20, marginTop: 8, borderTop: '1px solid var(--border)' }}>
+                                <button type="submit" className="btn btn-primary" disabled={loading}>
+                                    {loading ? 'Guardando…' : 'Guardar cambios'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </main>
         </div>
     );
 };
 
 export default Profile;
-
-/* COMPONENTES AUX */
-const Input = ({ label, ...props }) => (
-    <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-            {label}
-        </label>
-        <input
-            {...props}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-        />
-    </div>
-);
-
-const Select = ({ label, options, ...props }) => (
-    <div className="flex-1">
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-            {label}
-        </label>
-        <select
-            {...props}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-        >
-            {options.map(opt => (
-                <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                </option>
-            ))}
-        </select>
-    </div>
-);

@@ -1,137 +1,48 @@
-import { useState } from "react";
+import { useState } from 'react';
+import { Input, Select, Textarea, FormFooter } from './FormComponents';
 
-// Helper para normalizar fechas a YYYY-MM-DD
-const formatDate = (date) => {
-    if (!date) return "";
-    return date.split("T")[0];
-};
+const fmt = d => (!d ? '' : d.split('T')[0]);
 
 const ProjectForm = ({ initialData, clients, onSubmit, onCancel }) => {
-    const safeData = initialData || {};
-
+    const d = initialData || {};
     const [form, setForm] = useState({
-        client_id: safeData.client_id || "",
-        title: safeData.title || "",
-        description: safeData.description || "",
-        status: safeData.status || "pending",
-        start_date: formatDate(safeData.start_date),
-        end_date: formatDate(safeData.end_date),
-        budget: safeData.budget || "",
+        client_id:   d.client_id   || '',
+        title:       d.title       || '',
+        description: d.description || '',
+        status:      d.status      || 'pending',
+        start_date:  fmt(d.start_date),
+        end_date:    fmt(d.end_date),
+        budget:      d.budget      || '',
     });
-
-    const handleChange = (e) => {
-        setForm({
-            ...form,
-            [e.target.name]: e.target.value,
-        });
-    };
-
-    const handleSubmit = (e) => {
+    const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    const handleSubmit = e => {
         e.preventDefault();
-
-        if (!form.client_id || !form.title.trim()) {
-            alert("Cliente y título son obligatorios");
-            return;
-        }
-
+        if (!form.client_id || !form.title.trim()) return alert('Cliente y título son obligatorios');
         onSubmit(form);
     };
 
     return (
-        <form id="project-form" onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* CLIENTE */}
-                <div>
-                    <label className="block text-sm mb-1">Cliente</label>
-                    <select
-                        name="client_id"
-                        value={form.client_id}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    >
-                        <option value="">Selecciona</option>
-                        {clients.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
+        <form id="project-form" onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:13 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <Select label="Cliente" name="client_id" value={form.client_id} onChange={set} required
+                    placeholder="Selecciona un cliente"
+                    options={clients.map(c => ({ value:c.id, label:c.name }))} />
+                <Input label="Título del proyecto" name="title" value={form.title} onChange={set} required placeholder="Nombre del proyecto" />
+                <div style={{ gridColumn:'1 / -1' }}>
+                    <Textarea label="Descripción" name="description" value={form.description} onChange={set} rows={3} placeholder="Descripción del proyecto…" />
                 </div>
-
-                {/* TÍTULO */}
-                <div>
-                    <label className="block text-sm mb-1">Título</label>
-                    <input
-                        name="title"
-                        value={form.title}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    />
-                </div>
-
-                {/* DESCRIPCIÓN */}
-                <div className="md:col-span-2">
-                    <label className="block text-sm mb-1">Descripción</label>
-                    <textarea
-                        name="description"
-                        value={form.description}
-                        onChange={handleChange}
-                        rows={3}
-                        className="w-full border rounded-lg px-3 py-2"
-                    />
-                </div>
-
-                {/* ESTADO */}
-                <div>
-                    <label className="block text-sm mb-1">Estado</label>
-                    <select
-                        name="status"
-                        value={form.status}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    >
-                        <option value="pending">Pendiente</option>
-                        <option value="in_progress">En progreso</option>
-                        <option value="completed">Completado</option>
-                        <option value="cancelled">Cancelado</option>
-                    </select>
-                </div>
-
-                {/* PRESUPUESTO */}
-                <div>
-                    <label className="block text-sm mb-1">Presupuesto (€)</label>
-                    <input
-                        type="number"
-                        name="budget"
-                        value={form.budget}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    />
-                </div>
-
-                {/* FECHAS */}
-                <div>
-                    <label className="block text-sm mb-1">Inicio</label>
-                    <input
-                        type="date"
-                        name="start_date"
-                        value={form.start_date}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm mb-1">Fin</label>
-                    <input
-                        type="date"
-                        name="end_date"
-                        value={form.end_date}
-                        onChange={handleChange}
-                        className="w-full border rounded-lg px-3 py-2"
-                    />
-                </div>
+                <Select label="Estado" name="status" value={form.status} onChange={set}
+                    options={[
+                        { value:'pending',     label:'Pendiente' },
+                        { value:'in_progress', label:'En progreso' },
+                        { value:'completed',   label:'Completado' },
+                        { value:'cancelled',   label:'Cancelado' },
+                    ]} />
+                <Input label="Presupuesto (€)" name="budget" type="number" min="0" step="0.01" value={form.budget} onChange={set} placeholder="0.00" />
+                <Input label="Fecha de inicio" name="start_date" type="date" value={form.start_date} onChange={set} />
+                <Input label="Fecha de fin"    name="end_date"   type="date" value={form.end_date}   onChange={set} />
             </div>
+            <FormFooter onCancel={onCancel} />
         </form>
     );
 };

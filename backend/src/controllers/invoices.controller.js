@@ -2,7 +2,7 @@ import { pool } from '../config/db.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import { logActivity } from '../utils/activityLogger.js';
 
-// Crear facturas
+// Crear factura
 export const createInvoice = async (req, res) => {
     const {
         client_id,
@@ -32,13 +32,11 @@ export const createInvoice = async (req, res) => {
 
         // Comprobar cliente
         const [client] = await connection.query(
-            `
-      SELECT id
-      FROM clients
-      WHERE id = ?
-        AND user_id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT id
+             FROM clients
+             WHERE id = ?
+               AND user_id = ?
+               AND is_deleted = 0`,
             [client_id, req.user.id]
         );
 
@@ -50,12 +48,10 @@ export const createInvoice = async (req, res) => {
 
         // Crear factura
         const [invoiceResult] = await connection.query(
-            `
-      INSERT INTO invoices
-        (user_id, client_id, project_id, invoice_number,
-         issue_date, due_date, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+            `INSERT INTO invoices
+               (user_id, client_id, project_id, invoice_number,
+                issue_date, due_date, status, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 req.user.id,
                 client_id,
@@ -77,11 +73,9 @@ export const createInvoice = async (req, res) => {
             totalAmount += lineTotal;
 
             await connection.query(
-                `
-        INSERT INTO invoice_items
-          (invoice_id, description, quantity, unit_price, total)
-        VALUES (?, ?, ?, ?, ?)
-        `,
+                `INSERT INTO invoice_items
+                   (invoice_id, description, quantity, unit_price, total)
+                 VALUES (?, ?, ?, ?, ?)`,
                 [
                     invoiceId,
                     item.description,
@@ -122,31 +116,29 @@ export const createInvoice = async (req, res) => {
     }
 };
 
-// Get facturas
+// Obtener facturas
+// FIX: el UPDATE de overdue ahora está DENTRO del try/catch
 export const getInvoices = async (req, res) => {
-    await pool.query(
-        `
-    UPDATE invoices
-    SET status = 'overdue'
-    WHERE user_id = ?
-      AND status IN ('draft', 'sent')
-      AND due_date < CURDATE()
-      AND is_deleted = 0
-    `,
-        [req.user.id]
-    );
-
     try {
+        // Marcar como vencidas las que correspondan
+        await pool.query(
+            `UPDATE invoices
+             SET status = 'overdue'
+             WHERE user_id = ?
+               AND status IN ('draft', 'sent')
+               AND due_date < CURDATE()
+               AND is_deleted = 0`,
+            [req.user.id]
+        );
+
         const [rows] = await pool.query(
-            `
-      SELECT i.*, c.name AS client_name
-      FROM invoices i
-      JOIN clients c ON c.id = i.client_id
-      WHERE i.user_id = ?
-        AND i.is_deleted = 0
-        AND c.is_deleted = 0
-      ORDER BY i.created_at DESC
-      `,
+            `SELECT i.*, c.name AS client_name
+             FROM invoices i
+             JOIN clients c ON c.id = i.client_id
+             WHERE i.user_id = ?
+               AND i.is_deleted = 0
+               AND c.is_deleted = 0
+             ORDER BY i.created_at DESC`,
             [req.user.id]
         );
 
@@ -156,20 +148,18 @@ export const getInvoices = async (req, res) => {
     }
 };
 
-// Get facturas por ID
+// Obtener factura por ID
 export const getInvoiceById = async (req, res) => {
     const { id } = req.params;
 
     try {
         const [[invoice]] = await pool.query(
-            `
-      SELECT i.*, c.name AS client_name
-      FROM invoices i
-      JOIN clients c ON c.id = i.client_id
-      WHERE i.id = ?
-        AND i.user_id = ?
-        AND i.is_deleted = 0
-      `,
+            `SELECT i.*, c.name AS client_name
+             FROM invoices i
+             JOIN clients c ON c.id = i.client_id
+             WHERE i.id = ?
+               AND i.user_id = ?
+               AND i.is_deleted = 0`,
             [id, req.user.id]
         );
 
@@ -178,12 +168,10 @@ export const getInvoiceById = async (req, res) => {
         }
 
         const [items] = await pool.query(
-            `
-      SELECT *
-      FROM invoice_items
-      WHERE invoice_id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT *
+             FROM invoice_items
+             WHERE invoice_id = ?
+               AND is_deleted = 0`,
             [id]
         );
 
@@ -193,19 +181,17 @@ export const getInvoiceById = async (req, res) => {
     }
 };
 
-// Descargar factura
+// Descargar PDF
 export const downloadInvoicePDF = async (req, res) => {
     const { id } = req.params;
 
     try {
         const [[invoice]] = await pool.query(
-            `
-      SELECT *
-      FROM invoices
-      WHERE id = ?
-        AND user_id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT *
+             FROM invoices
+             WHERE id = ?
+               AND user_id = ?
+               AND is_deleted = 0`,
             [id, req.user.id]
         );
 
@@ -214,22 +200,18 @@ export const downloadInvoicePDF = async (req, res) => {
         }
 
         const [items] = await pool.query(
-            `
-      SELECT *
-      FROM invoice_items
-      WHERE invoice_id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT *
+             FROM invoice_items
+             WHERE invoice_id = ?
+               AND is_deleted = 0`,
             [id]
         );
 
         const [[client]] = await pool.query(
-            `
-      SELECT name, email
-      FROM clients
-      WHERE id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT name, email
+             FROM clients
+             WHERE id = ?
+               AND is_deleted = 0`,
             [invoice.client_id]
         );
 
@@ -245,7 +227,7 @@ export const downloadInvoicePDF = async (req, res) => {
     }
 };
 
-// Soft delete para factura
+// Soft delete de factura
 export const softDeleteInvoice = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
@@ -255,15 +237,12 @@ export const softDeleteInvoice = async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // Comprobar factura
         const [[invoice]] = await conn.query(
-            `
-      SELECT status
-      FROM invoices
-      WHERE id = ?
-        AND user_id = ?
-        AND is_deleted = 0
-      `,
+            `SELECT status
+             FROM invoices
+             WHERE id = ?
+               AND user_id = ?
+               AND is_deleted = 0`,
             [id, userId]
         );
 
@@ -277,28 +256,17 @@ export const softDeleteInvoice = async (req, res) => {
                 .json({ message: 'No se puede eliminar una factura pagada' });
         }
 
-        // Soft delete factura
         await conn.query(
-            `
-      UPDATE invoices
-      SET is_deleted = 1,
-          deleted_at = NOW(),
-          deleted_by = ?
-      WHERE id = ?
-        AND user_id = ?
-      `,
+            `UPDATE invoices
+             SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?
+             WHERE id = ? AND user_id = ?`,
             [userId, id, userId]
         );
 
-        // Soft delete líneas
         await conn.query(
-            `
-      UPDATE invoice_items
-      SET is_deleted = 1,
-          deleted_at = NOW(),
-          deleted_by = ?
-      WHERE invoice_id = ?
-      `,
+            `UPDATE invoice_items
+             SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?
+             WHERE invoice_id = ?`,
             [userId, id]
         );
 
@@ -321,7 +289,7 @@ export const softDeleteInvoice = async (req, res) => {
     }
 };
 
-
+// Actualizar factura
 export const updateInvoice = async (req, res) => {
     const { id } = req.params;
     const {
@@ -340,38 +308,33 @@ export const updateInvoice = async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1️⃣ Comprobar factura
+        // Comprobar existencia y propiedad en una sola query
         const [[invoice]] = await conn.query(
-            `SELECT id FROM invoices
+            `SELECT id, status
+             FROM invoices
              WHERE id = ? AND user_id = ? AND is_deleted = 0`,
             [id, userId]
         );
 
         if (!invoice) {
-            return res.status(404).json({ message: "Factura no encontrada" });
+            return res.status(404).json({ message: 'Factura no encontrada' });
         }
 
-        const [[current]] = await conn.query(
-            `SELECT status FROM invoices WHERE id = ?`,
-            [id]
-        );
-
-        if (current.status === "paid") {
+        if (invoice.status === 'paid') {
             return res
                 .status(400)
-                .json({ message: "No se puede modificar una factura pagada" });
+                .json({ message: 'No se puede modificar una factura pagada' });
         }
 
-
-        // 2️⃣ Actualizar cabecera
+        // Actualizar cabecera
         await conn.query(
             `UPDATE invoices SET
-                client_id = ?,
-                project_id = ?,
-                issue_date = ?,
-                due_date = ?,
-                status = ?,
-                notes = ?
+               client_id = ?,
+               project_id = ?,
+               issue_date = ?,
+               due_date = ?,
+               status = ?,
+               notes = ?
              WHERE id = ?`,
             [
                 client_id,
@@ -384,7 +347,7 @@ export const updateInvoice = async (req, res) => {
             ]
         );
 
-        // 3️⃣ Eliminar líneas antiguas (soft)
+        // Soft delete de líneas antiguas
         await conn.query(
             `UPDATE invoice_items
              SET is_deleted = 1
@@ -392,36 +355,36 @@ export const updateInvoice = async (req, res) => {
             [id]
         );
 
-        // 4️⃣ Insertar nuevas líneas
+        // Insertar nuevas líneas
         let totalAmount = 0;
 
         for (const item of items) {
-            const lineTotal =
-                Number(item.quantity) * Number(item.unit_price);
+            const lineTotal = Number(item.quantity) * Number(item.unit_price);
             totalAmount += lineTotal;
 
             await conn.query(
                 `INSERT INTO invoice_items
-                 (invoice_id, description, quantity, unit_price, total)
+                   (invoice_id, description, quantity, unit_price, total)
                  VALUES (?, ?, ?, ?, ?)`,
-                [
-                    id,
-                    item.description,
-                    item.quantity,
-                    item.unit_price,
-                    lineTotal,
-                ]
+                [id, item.description, item.quantity, item.unit_price, lineTotal]
             );
         }
 
-        // 5️⃣ Actualizar total
+        // Actualizar total
         await conn.query(
             `UPDATE invoices SET total_amount = ? WHERE id = ?`,
             [totalAmount, id]
         );
 
+        await logActivity({
+            userId,
+            entity: 'invoice',
+            entityId: id,
+            action: 'updated',
+        });
+
         await conn.commit();
-        res.json({ message: "Factura actualizada" });
+        res.json({ message: 'Factura actualizada' });
 
     } catch (err) {
         await conn.rollback();
@@ -430,4 +393,3 @@ export const updateInvoice = async (req, res) => {
         conn.release();
     }
 };
-

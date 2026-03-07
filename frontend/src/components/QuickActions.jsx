@@ -1,26 +1,29 @@
+import { useNavigate } from 'react-router-dom';
+import { UserPlus, FileText, TrendingDown, FolderPlus } from 'lucide-react';
+
+const ACTIONS = [
+    { label:'Nuevo cliente',   icon:<UserPlus size={15}/>,     to:'/clients',  iconBg:'var(--primary-light)',   iconColor:'var(--primary)'   },
+    { label:'Nueva factura',   icon:<FileText size={15}/>,     to:'/invoices', iconBg:'var(--secondary-light)', iconColor:'var(--secondary)' },
+    { label:'Registrar gasto', icon:<TrendingDown size={15}/>, to:'/expenses', iconBg:'var(--error-light)',     iconColor:'var(--error)'     },
+    { label:'Nuevo proyecto',  icon:<FolderPlus size={15}/>,   to:'/projects', iconBg:'var(--warning-light)',   iconColor:'var(--warning)'   },
+];
+
 const QuickActions = () => {
+    const navigate = useNavigate();
     return (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 mt-12">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">
+        <div className="card card-p">
+            <h3 style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)', marginBottom:14 }}>
                 Acciones rápidas
             </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button className="flex active:scale-[0.98] items-center justify-center gap-2 rounded-lg py-3 font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition cursor-pointer">
-                    + Nuevo cliente
-                </button>
-
-                <button className="flex active:scale-[0.98] items-center justify-center gap-2 rounded-lg py-3 font-medium bg-green-50 text-green-600 hover:bg-green-100 transition cursor-pointer">
-                    + Nueva factura
-                </button>
-
-                <button className="flex active:scale-[0.98] items-center justify-center gap-2 rounded-lg py-3 font-medium bg-red-50 text-red-600 hover:bg-red-100 transition cursor-pointer">
-                    + Nuevo gasto
-                </button>
-
-                <button className="flex active:scale-[0.98] items-center justify-center gap-2 rounded-lg py-3 font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition cursor-pointer">
-                    + Nuevo proyecto
-                </button>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {ACTIONS.map(({ label, icon, to, iconBg, iconColor }) => (
+                    <button key={to} className="quick-action-btn" onClick={() => navigate(to)}>
+                        <span className="quick-action-icon" style={{ background:iconBg, color:iconColor }}>
+                            {icon}
+                        </span>
+                        {label}
+                    </button>
+                ))}
             </div>
         </div>
     );

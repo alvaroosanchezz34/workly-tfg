@@ -1,157 +1,162 @@
-import { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../context/AuthContext";
-import Sidebar from "../components/Sidebar";
-import ProjectForm from "../components/ProjectForm";
-import {
-    getProjects,
-    createProject,
-    updateProject,
-} from "../api/projects";
-import { getClients } from "../api/clients";
+import { useContext, useEffect, useState } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import Sidebar from '../components/Sidebar';
+import ProjectForm from '../components/ProjectForm';
+import Modal from '../components/Modal';
+import { getProjects, createProject, updateProject, deleteProject } from '../api/projects';
+import { getClients } from '../api/clients';
+import { Plus, FolderOpen, CalendarDays } from 'lucide-react';
+
+const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
+const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+const STATUS = {
+    pending:     { label: 'Pendiente',   cls: 'badge badge-pending'     },
+    in_progress: { label: 'En progreso', cls: 'badge badge-in_progress' },
+    completed:   { label: 'Completado',  cls: 'badge badge-completed'   },
+    cancelled:   { label: 'Cancelado',   cls: 'badge badge-cancelled'   },
+};
 
 export default function Projects() {
     const { token } = useContext(AuthContext);
-
     const [projects, setProjects] = useState([]);
-    const [clients, setClients] = useState([]);
-    const [loading, setLoading] = useState(true);
-
+    const [clients,  setClients]  = useState([]);
+    const [loading,  setLoading]  = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [editing, setEditing] = useState(null);
+    const [editing,  setEditing]  = useState(null);
+    const [toDelete, setToDelete] = useState(null);
 
-    const loadData = async () => {
+    const load = async () => {
         setLoading(true);
-        const [p, c] = await Promise.all([
-            getProjects(token),
-            getClients(token),
-        ]);
-        setProjects(p);
-        setClients(c);
-        setLoading(false);
+        try {
+            const [p, c] = await Promise.all([getProjects(token), getClients(token)]);
+            setProjects(p); setClients(c);
+        } finally { setLoading(false); }
     };
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { if (token) load(); }, [token]);
 
-    const handleCreate = async (data) => {
-        await createProject(token, data);
-        setShowForm(false);
-        loadData();
-    };
+    const handleCreate = async d => { await createProject(token, d); setShowForm(false); load(); };
+    const handleEdit   = async d => { await updateProject(token, editing.id, d); setEditing(null); load(); };
+    const handleDelete = async () => { await deleteProject(token, toDelete.id); setToDelete(null); load(); };
 
-    const handleUpdate = async (data) => {
-        await updateProject(token, editing.id, data);
-        setEditing(null);
-        setShowForm(false);
-        loadData();
-    };
+    const openEdit = p => { setEditing(p); setShowForm(true); };
+    const closeModal = () => { setShowForm(false); setEditing(null); };
 
     return (
-        <div className="flex">
+        <div className="app-layout">
             <Sidebar />
+            <main className="page-content">
 
-            <div className="flex-1 p-6 ml-64">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-semibold">Proyectos</h1>
-                    <button
-                        onClick={() => {
-                            setEditing(null);
-                            setShowForm(true);
-                        }}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg"
-                    >
-                        + Nuevo proyecto
+                {/* ── HEADER ── */}
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Proyectos</h1>
+                        <p className="page-subtitle">{projects.length} proyecto{projects.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
+                        <Plus size={15} /> Nuevo proyecto
                     </button>
                 </div>
 
+                {/* ── TABLA ── */}
                 {loading ? (
-                    <p>Cargando...</p>
+                    <div className="table-wrap">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5' }}>
+                                <div className="skeleton" style={{ height: 12, width: '40%', marginBottom: 8 }} />
+                                <div className="skeleton" style={{ height: 10, width: '25%' }} />
+                            </div>
+                        ))}
+                    </div>
+                ) : projects.length === 0 ? (
+                    <div className="table-wrap">
+                        <div className="empty-state">
+                            <div className="empty-icon"><FolderOpen size={22} /></div>
+                            <p className="empty-title">Sin proyectos</p>
+                            <p className="empty-desc">Crea tu primer proyecto y asócialo a un cliente existente</p>
+                            <button className="btn btn-primary" style={{ marginTop: 10 }}
+                                onClick={() => setShowForm(true)}>
+                                <Plus size={14} /> Nuevo proyecto
+                            </button>
+                        </div>
+                    </div>
                 ) : (
-                    <div className="bg-white border rounded-xl overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead className="bg-slate-50">
+                    <div className="table-wrap">
+                        <table className="data-table">
+                            <thead>
                                 <tr>
-                                    <th className="px-4 py-3 text-left">Título</th>
-                                    <th className="px-4 py-3 text-left">Cliente</th>
-                                    <th className="px-4 py-3 text-left">Estado</th>
-                                    <th className="px-4 py-3 text-left">Presupuesto</th>
-                                    <th className="px-4 py-3 text-right">Acciones</th>
+                                    <th>Proyecto</th>
+                                    <th>Cliente</th>
+                                    <th>Estado</th>
+                                    <th>Fechas</th>
+                                    <th>Presupuesto</th>
+                                    <th style={{ textAlign: 'right' }}>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {projects.map((p) => (
-                                    <tr key={p.id} className="border-t">
-                                        <td className="px-4 py-3">{p.title}</td>
-                                        <td className="px-4 py-3">{p.client_name}</td>
-                                        <td className="px-4 py-3 capitalize">{p.status}</td>
-                                        <td className="px-4 py-3 capitalize">{p.budget}€</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button
-                                                onClick={() => {
-                                                    setEditing(p);
-                                                    setShowForm(true);
-                                                }}
-                                                className="text-indigo-600 hover:underline"
-                                            >
-                                                Editar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {projects.map((p, idx) => {
+                                    const s = STATUS[p.status] || { label: p.status, cls: 'badge' };
+                                    return (
+                                        <tr key={p.id} style={{ animationDelay: `${idx * 25}ms` }}>
+                                            <td>
+                                                <div style={{ fontWeight: 500 }}>{p.title}</div>
+                                                {p.description && (
+                                                    <div style={{ fontSize: 12, color: 'var(--text-disabled)', marginTop: 2, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {p.description}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td style={{ color: 'var(--text-secondary)' }}>{p.client_name}</td>
+                                            <td>
+                                                <span className={s.cls}>
+                                                    <span className="badge-dot" />{s.label}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                                                    <CalendarDays size={12} color="var(--text-disabled)" />
+                                                    {fmtDate(p.start_date)} → {fmtDate(p.end_date)}
+                                                </div>
+                                            </td>
+                                            <td style={{ fontWeight: 600 }}>
+                                                {p.budget ? fmt(p.budget) : <span style={{ color: 'var(--text-disabled)' }}>—</span>}
+                                            </td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                <button className="action-link action-link-primary" onClick={() => openEdit(p)}>Editar</button>
+                                                <button className="action-link action-link-danger" style={{ marginLeft: 4 }} onClick={() => setToDelete(p)}>Eliminar</button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
                 )}
-            </div>
+            </main>
 
-            {/* MODAL */}
-            {showForm && (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                        {/* HEADER */}
-                        <div className="px-6 py-4 border-b">
-                            <h2 className="text-lg font-semibold">
-                                {editing ? "Editar proyecto" : "Nuevo proyecto"}
-                            </h2>
-                        </div>
+            {/* ── MODAL FORM ── */}
+            <Modal open={showForm} size="lg" title={editing ? 'Editar proyecto' : 'Nuevo proyecto'} onClose={closeModal}>
+                <ProjectForm
+                    initialData={editing}
+                    clients={clients}
+                    onSubmit={editing ? handleEdit : handleCreate}
+                    onCancel={closeModal}
+                />
+            </Modal>
 
-                        {/* BODY */}
-                        <div className="px-6 py-4 overflow-y-auto">
-                            <ProjectForm
-                                initialData={editing}
-                                clients={clients}
-                                onSubmit={editing ? handleUpdate : handleCreate}
-                                onCancel={() => {
-                                    setShowForm(false);
-                                    setEditing(null);
-                                }}
-                            />
-                        </div>
-
-                        {/* FOOTER */}
-                        <div className="px-6 py-4 border-t flex justify-end gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowForm(false);
-                                    setEditing(null);
-                                }}
-                                className="px-4 py-2 rounded-lg border"
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                type="submit"
-                                form="project-form"
-                                className="px-4 py-2 rounded-lg bg-indigo-600 text-white"
-                            >
-                                Guardar
-                            </button>
-                        </div>
-                    </div>
+            {/* ── MODAL CONFIRMAR BORRADO ── */}
+            <Modal open={!!toDelete} title="Eliminar proyecto" onClose={() => setToDelete(null)}>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                    ¿Eliminar el proyecto{' '}
+                    <strong style={{ color: 'var(--text-primary)' }}>{toDelete?.title}</strong>?
+                    {' '}Esta acción no se puede deshacer.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                    <button className="btn btn-ghost" onClick={() => setToDelete(null)}>Cancelar</button>
+                    <button className="btn btn-danger" onClick={handleDelete}>Eliminar</button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 }

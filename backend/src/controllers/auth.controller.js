@@ -4,10 +4,25 @@ import { pool } from "../config/db.js";
 
 // REGISTRO
 export const register = async (req, res) => {
-    const { name, email, password, role = "user" } = req.body;
+    const { name, email, password } = req.body;
+
+    // Validación básica de entrada
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: "Todos los campos son obligatorios" });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Email no válido" });
+    }
 
     try {
-        // comprobar si el email ya existe
+        // Comprobar si el email ya existe
         const [existing] = await pool.query(
             "SELECT id FROM users WHERE email = ?",
             [email]
@@ -17,13 +32,13 @@ export const register = async (req, res) => {
             return res.status(400).json({ message: "Email ya registrado" });
         }
 
-        // hash contraseña
+        // Hash contraseña
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // guardar usuario
+        // FIX: el role NUNCA viene del cliente, siempre se fuerza a 'user'
         const [result] = await pool.query(
-            "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-            [name, email, hashedPassword, role]
+            "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')",
+            [name, email, hashedPassword]
         );
 
         res.status(201).json({
@@ -39,6 +54,10 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email y contraseña son obligatorios" });
+    }
+
     try {
         const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
             email,
@@ -50,20 +69,28 @@ export const login = async (req, res) => {
 
         const user = rows[0];
 
+        // Comprobar si la cuenta está activa
+        if (user.status !== "active") {
+            return res.status(403).json({ message: "Cuenta suspendida o inactiva" });
+        }
+
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.status(401).json({ message: "Credenciales incorrectas" });
         }
 
-        // crear token
+        // Actualizar last_login
+        await pool.query("UPDATE users SET last_login = NOW() WHERE id = ?", [user.id]);
+
+        // Crear tokens
         const accessToken = jwt.sign(
-            { id: user.id, role: user.role },
+            { id: user.id, role: user.role },   // siempre incluir role
             process.env.JWT_SECRET,
             { expiresIn: "30m" }
         );
 
         const refreshToken = jwt.sign(
-            { id: user.id },
+            { id: user.id, role: user.role },   // FIX: incluir role también aquí
             process.env.JWT_REFRESH_SECRET,
             { expiresIn: "7d" }
         );
@@ -75,7 +102,7 @@ export const login = async (req, res) => {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                company: user.company,
+                company: user.company_name,
                 avatar_url: user.avatar_url,
                 role: user.role,
             },
@@ -85,6 +112,7 @@ export const login = async (req, res) => {
     }
 };
 
+// REFRESH TOKEN
 export const refreshToken = async (req, res) => {
     const { refreshToken } = req.body;
 
@@ -98,8 +126,9 @@ export const refreshToken = async (req, res) => {
             process.env.JWT_REFRESH_SECRET
         );
 
+        // FIX: propagar el role al nuevo accessToken
         const newAccessToken = jwt.sign(
-            { id: decoded.id },
+            { id: decoded.id, role: decoded.role },
             process.env.JWT_SECRET,
             { expiresIn: "30m" }
         );
