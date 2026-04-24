@@ -1,23 +1,29 @@
 import {
     LayoutDashboard, Users, FolderOpen, FileText,
     CreditCard, Wrench, Activity, Trash2,
-    ChevronUp, LogOut, UserCircle, Building2, UsersRound,
+    ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useContext, useState, useRef, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { ThemeContext } from '../context/ThemeContext';
+import { UIContext } from '../context/UIContext';
 
 export default function Sidebar() {
-    const { logout, user, company, isCompanyAdmin } = useContext(AuthContext);
-    const navigate = useNavigate();
+    const { logout, user }             = useContext(AuthContext);
+    const { theme, toggle }            = useContext(ThemeContext);
+    const { openSearch, toggleNotif, unread } = useContext(UIContext);
+
+    const navigate   = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
-    const menuRef = useRef(null);
-    const btnRef  = useRef(null);
+    const menuRef    = useRef(null);
+    const btnRef     = useRef(null);
 
     useEffect(() => {
         const close = e => {
-            if (menuOpen && menuRef.current && !menuRef.current.contains(e.target)
-                && btnRef.current && !btnRef.current.contains(e.target))
+            if (menuOpen
+                && menuRef.current && !menuRef.current.contains(e.target)
+                && btnRef.current  && !btnRef.current.contains(e.target))
                 setMenuOpen(false);
         };
         document.addEventListener('mousedown', close);
@@ -29,16 +35,32 @@ export default function Sidebar() {
 
     return (
         <aside className="sidebar">
+
             {/* LOGO */}
             <div className="sidebar-logo">
                 <div className="sidebar-logo-icon">W</div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="sidebar-logo-name">WORKLY</div>
-                    <div className="sidebar-logo-sub">
-                        {company?.name || 'Gestión freelance'}
-                    </div>
+                    <div className="sidebar-logo-sub">Gestión freelance</div>
                 </div>
+                <button
+                    onClick={toggle}
+                    title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                    style={{ width: 28, height: 28, border: 'none', borderRadius: 6, background: 'rgba(255,255,255,0.07)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}
+                >
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                </button>
             </div>
+
+            {/* BUSCADOR */}
+            <button
+                onClick={openSearch}
+                style={{ margin: '10px 10px 4px', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 12.5, fontFamily: 'Inter, sans-serif', width: 'calc(100% - 20px)' }}
+            >
+                <Search size={13} />
+                <span style={{ flex: 1, textAlign: 'left' }}>Buscar…</span>
+                <kbd style={{ fontSize: 10, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '2px 5px' }}>⌘K</kbd>
+            </button>
 
             {/* NAV */}
             <nav className="sidebar-nav">
@@ -52,27 +74,6 @@ export default function Sidebar() {
                 <Item to="/expenses"  icon={<CreditCard size={16}/>}      label="Gastos" />
                 <Item to="/services"  icon={<Wrench size={16}/>}          label="Servicios" />
 
-                {/* Sección empresa — solo si tiene empresa */}
-                {(company || isCompanyAdmin) && (
-                    <>
-                        <span className="sidebar-section-label" style={{ marginTop: 8 }}>Empresa</span>
-                        <Item to="/team" icon={<UsersRound size={16}/>} label="Equipo" />
-                    </>
-                )}
-
-                {/* Si no tiene empresa, botón para crear */}
-                {!company && (
-                    <>
-                        <span className="sidebar-section-label" style={{ marginTop: 8 }}>Empresa</span>
-                        <NavLink to="/company/setup" className="sidebar-item" style={{ opacity: 0.7 }}>
-                            <span className="sidebar-icon"><Building2 size={16}/></span>
-                            <span style={{ flex: 1 }}>Crear empresa</span>
-                            <span style={{ fontSize: 9, background: 'var(--primary-light)', color: 'var(--primary)', padding: '2px 6px', borderRadius: 99, fontWeight: 700 }}>Nuevo</span>
-                        </NavLink>
-                    </>
-                )}
-
-                {/* Admin global */}
                 {user?.role === 'admin' && (
                     <>
                         <div className="sidebar-divider" />
@@ -85,6 +86,36 @@ export default function Sidebar() {
 
             {/* USER BLOCK */}
             <div className="sidebar-user">
+
+                {/* Campanita */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px 8px' }}>
+                    <button
+                        onClick={toggleNotif}
+                        title="Notificaciones"
+                        style={{
+                            position: 'relative',
+                            width: 32, height: 32,
+                            border: 'none', borderRadius: 6,
+                            background: 'rgba(255,255,255,0.06)',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: unread > 0 ? '#FFA726' : 'rgba(255,255,255,0.45)',
+                        }}
+                    >
+                        <Bell size={15} />
+                        {unread > 0 && (
+                            <span style={{
+                                position: 'absolute', top: 5, right: 5,
+                                width: 7, height: 7,
+                                background: '#F44336',
+                                borderRadius: '50%',
+                                border: '1.5px solid #121212',
+                            }} />
+                        )}
+                    </button>
+                </div>
+
+                {/* Botón usuario */}
                 <button ref={btnRef} className="sidebar-user-btn" onClick={() => setMenuOpen(v => !v)}>
                     {user?.avatar_url
                         ? <img src={user.avatar_url} alt="avatar" className="sidebar-avatar" style={{ objectFit: 'cover' }} />
@@ -92,22 +123,21 @@ export default function Sidebar() {
                     }
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="sidebar-user-name">{user?.name || 'Usuario'}</div>
-                        <div className="sidebar-user-sub">
-                            {company?.name || user?.company_name || user?.email || ''}
-                        </div>
+                        <div className="sidebar-user-sub">{user?.company_name || user?.email || ''}</div>
                     </div>
                     <ChevronUp size={13} style={{ color: 'rgba(255,255,255,0.25)', transition: 'transform .2s', transform: menuOpen ? 'rotate(0deg)' : 'rotate(180deg)', flexShrink: 0 }} />
                 </button>
 
+                {/* Popup */}
                 <div ref={menuRef} className={`popup-menu ${menuOpen ? 'open' : 'closed'}`}>
                     <NavLink to="/profile" onClick={() => setMenuOpen(false)} className="popup-item">
                         <UserCircle size={14} /> Editar perfil
                     </NavLink>
-                    {company && (
-                        <NavLink to="/team" onClick={() => setMenuOpen(false)} className="popup-item">
-                            <UsersRound size={14} /> Mi equipo
-                        </NavLink>
-                    )}
+                    <div className="popup-separator" />
+                    <button onClick={() => { toggle(); setMenuOpen(false); }} className="popup-item">
+                        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                        {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                    </button>
                     <div className="popup-separator" />
                     <button onClick={handleLogout} className="popup-item popup-item-danger">
                         <LogOut size={14} /> Cerrar sesión

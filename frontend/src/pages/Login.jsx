@@ -1,12 +1,11 @@
 import { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const Login = () => {
     const { login } = useContext(AuthContext);
     const navigate  = useNavigate();
-
     const [email,    setEmail]    = useState('');
     const [password, setPassword] = useState('');
     const [showPw,   setShowPw]   = useState(false);
@@ -62,39 +61,35 @@ const Login = () => {
                 <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
                     <div>
                         <label className="login-label">Email</label>
-                        <input
-                            className="login-input"
-                            type="email" placeholder="tu@email.com"
+                        <input className="login-input" type="email" placeholder="tu@email.com"
                             value={email} onChange={e => setEmail(e.target.value)}
-                            required autoComplete="email"
-                        />
+                            required autoComplete="email" />
                     </div>
-
                     <div>
                         <label className="login-label">Contraseña</label>
                         <div style={{ position:'relative' }}>
-                            <input
-                                className="login-input"
-                                type={showPw ? 'text' : 'password'} placeholder="••••••••"
+                            <input className="login-input" type={showPw ? 'text' : 'password'} placeholder="••••••••"
                                 value={password} onChange={e => setPassword(e.target.value)}
-                                required style={{ paddingRight:42 }}
-                            />
+                                required style={{ paddingRight:42 }} />
                             <button type="button" onClick={() => setShowPw(v => !v)}
                                 style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', display:'flex', padding:0 }}>
                                 {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                             </button>
                         </div>
                     </div>
-
                     <button type="submit" className="login-btn" disabled={loading} style={{ marginTop:6 }}>
                         {loading
                             ? <><Loader2 size={16} style={{ animation:'spin 0.8s linear infinite' }}/>Accediendo…</>
-                            : 'Iniciar sesión'
-                        }
+                            : 'Iniciar sesión'}
                     </button>
                 </form>
 
-                <p style={{ marginTop:28, fontSize:11, color:'rgba(255,255,255,0.16)', textAlign:'center' }}>
+                <p style={{ marginTop:20, fontSize:13, color:'rgba(255,255,255,0.3)', textAlign:'center' }}>
+                    ¿No tienes cuenta?{' '}
+                    <Link to="/register" style={{ color:'var(--primary)', textDecoration:'none', fontWeight:600 }}>Crear cuenta</Link>
+                </p>
+
+                <p style={{ marginTop:16, fontSize:11, color:'rgba(255,255,255,0.16)', textAlign:'center' }}>
                     © {new Date().getFullYear()} Workly · Todos los derechos reservados
                 </p>
             </div>
