@@ -27,18 +27,23 @@ export default function Invoices() {
     const [clients,   setClients]   = useState([]);
     const [projects,  setProjects]  = useState([]);
     const [loading,   setLoading]   = useState(true);
+    const [error,     setError]     = useState('');
     const [showForm,  setShowForm]  = useState(false);
     const [editing,   setEditing]   = useState(null);
     const [toDelete,  setToDelete]  = useState(null);
     const [filter,    setFilter]    = useState('all');
+    const [downloading, setDownloading] = useState(null);
 
     const load = async () => {
         setLoading(true);
+        setError('');
         try {
             const [inv, cli, proj] = await Promise.all([
                 getInvoices(token), getClients(token), getProjects(token),
             ]);
             setInvoices(inv); setClients(cli); setProjects(proj);
+        } catch {
+            setError('No se pudieron cargar las facturas.');
         } finally { setLoading(false); }
     };
 
@@ -57,6 +62,13 @@ export default function Invoices() {
 
     const handleDelete = async () => { await deleteInvoice(token, toDelete.id); setToDelete(null); load(); };
     const closeModal   = () => { setShowForm(false); setEditing(null); };
+
+    const handleDownload = async (inv) => {
+        setDownloading(inv.id);
+        try { await downloadInvoicePDF(token, inv.id); }
+        catch { alert('Error al descargar el PDF'); }
+        finally { setDownloading(null); }
+    };
 
     const visible      = filter === 'all' ? invoices : invoices.filter(i => i.status === filter);
     const totalVisible = visible.reduce((s, i) => s + Number(i.total_amount || 0), 0);
@@ -80,6 +92,10 @@ export default function Invoices() {
                         <Plus size={15} /> Nueva factura
                     </button>
                 </div>
+
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
+                )}
 
                 {/* ── FILTROS ── */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -174,8 +190,9 @@ export default function Invoices() {
                                                 <button
                                                     className="btn-icon"
                                                     title="Descargar PDF"
-                                                    style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 4 }}
-                                                    onClick={() => downloadInvoicePDF(token, inv.id)}
+                                                    disabled={downloading === inv.id}
+                                                    style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 4, opacity: downloading === inv.id ? 0.5 : 1 }}
+                                                    onClick={() => handleDownload(inv)}
                                                 >
                                                     <Download size={13} />
                                                 </button>
@@ -190,24 +207,19 @@ export default function Invoices() {
                 )}
             </main>
 
-            {/* ── MODAL FORM ── */}
-            {showForm && (
-                <div className="modal-backdrop" onClick={closeModal}>
-                    <div className="modal-box modal-box-lg" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title">{editing ? 'Editar factura' : 'Nueva factura'}</h3>
-                            <button className="modal-close" onClick={closeModal}>✕</button>
-                        </div>
-                        <div className="modal-body">
-                            <InvoiceForm clients={clients} projects={projects} initialData={editing} onSubmit={handleSubmit} />
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
-                            <button className="btn btn-primary" form="invoice-form" type="submit">Guardar factura</button>
-                        </div>
-                    </div>
+            {/* ── MODAL FORM (usando componente Modal) ── */}
+            <Modal open={showForm} size="lg" title={editing ? 'Editar factura' : 'Nueva factura'} onClose={closeModal}>
+                <InvoiceForm
+                    clients={clients}
+                    projects={projects}
+                    initialData={editing}
+                    onSubmit={handleSubmit}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 18, borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                    <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
+                    <button className="btn btn-primary" form="invoice-form" type="submit">Guardar factura</button>
                 </div>
-            )}
+            </Modal>
 
             {/* ── MODAL CONFIRMAR BORRADO ── */}
             <Modal open={!!toDelete} title="Eliminar factura" onClose={() => setToDelete(null)}>

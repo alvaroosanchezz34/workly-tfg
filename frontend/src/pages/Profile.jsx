@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { updateProfile } from '../api/users';
 import Sidebar from '../components/Sidebar';
@@ -7,6 +7,7 @@ import { CheckCircle, Camera } from 'lucide-react';
 
 const Profile = () => {
     const { token, user, login } = useContext(AuthContext);
+    const avatarInputRef = useRef(null);
 
     const [form, setForm] = useState({
         name:         user?.name         || '',
@@ -29,8 +30,12 @@ const Profile = () => {
         e.preventDefault();
         setLoading(true); setSuccess(false); setError('');
         try {
-            const updated = await updateProfile(token, form);
+            const payload = { ...form };
+            // No enviar contraseña vacía
+            if (!payload.password) delete payload.password;
+            const updated = await updateProfile(token, payload);
             login(token, localStorage.getItem('refreshToken'), updated);
+            setForm(f => ({ ...f, password: '' }));
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3500);
         } catch (err) {
@@ -38,6 +43,12 @@ const Profile = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // FIX: el botón de cámara abre el input de URL del avatar con foco
+    const handleCameraClick = () => {
+        avatarInputRef.current?.focus();
+        avatarInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
     const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U';
@@ -72,14 +83,21 @@ const Profile = () => {
                                     : initials
                                 }
                             </div>
-                            <div style={{
-                                position: 'absolute', bottom: -4, right: -4,
-                                width: 22, height: 22, borderRadius: '50%',
-                                background: 'var(--primary)', border: '2px solid #fff',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
+                            {/* FIX: botón de cámara lleva al campo de URL del avatar */}
+                            <button
+                                type="button"
+                                onClick={handleCameraClick}
+                                title="Cambiar avatar"
+                                style={{
+                                    position: 'absolute', bottom: -4, right: -4,
+                                    width: 22, height: 22, borderRadius: '50%',
+                                    background: 'var(--primary)', border: '2px solid #fff',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer',
+                                }}
+                            >
                                 <Camera size={10} color="#fff" />
-                            </div>
+                            </button>
                         </div>
 
                         <div>
@@ -124,7 +142,18 @@ const Profile = () => {
                                 <Input label="Teléfono" name="phone" value={form.phone} onChange={set} placeholder="+34 600 000 000" />
                                 <Input label="Empresa" name="company_name" value={form.company_name} onChange={set} placeholder="Nombre de tu empresa" />
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <Input label="URL del avatar" name="avatar_url" value={form.avatar_url} onChange={set} placeholder="https://ejemplo.com/foto.jpg" />
+                                    {/* FIX: ref para que el botón de cámara pueda hacer foco aquí */}
+                                    <div className="form-group">
+                                        <label className="form-label">URL del avatar</label>
+                                        <input
+                                            ref={avatarInputRef}
+                                            className="form-input"
+                                            name="avatar_url"
+                                            value={form.avatar_url}
+                                            onChange={set}
+                                            placeholder="https://ejemplo.com/foto.jpg"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

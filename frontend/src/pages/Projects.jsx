@@ -5,7 +5,7 @@ import ProjectForm from '../components/ProjectForm';
 import Modal from '../components/Modal';
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects';
 import { getClients } from '../api/clients';
-import { Plus, FolderOpen, CalendarDays } from 'lucide-react';
+import { Plus, FolderOpen, CalendarDays, Search } from 'lucide-react';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -17,20 +17,29 @@ const STATUS = {
     cancelled:   { label: 'Cancelado',   cls: 'badge badge-cancelled'   },
 };
 
+const STATUS_FILTERS = ['all', 'pending', 'in_progress', 'completed', 'cancelled'];
+const STATUS_FILTER_LABEL = { all: 'Todos', pending: 'Pendiente', in_progress: 'En progreso', completed: 'Completado', cancelled: 'Cancelado' };
+
 export default function Projects() {
     const { token } = useContext(AuthContext);
-    const [projects, setProjects] = useState([]);
-    const [clients,  setClients]  = useState([]);
-    const [loading,  setLoading]  = useState(true);
-    const [showForm, setShowForm] = useState(false);
-    const [editing,  setEditing]  = useState(null);
-    const [toDelete, setToDelete] = useState(null);
+    const [projects,  setProjects]  = useState([]);
+    const [clients,   setClients]   = useState([]);
+    const [loading,   setLoading]   = useState(true);
+    const [error,     setError]     = useState('');
+    const [search,    setSearch]    = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [showForm,  setShowForm]  = useState(false);
+    const [editing,   setEditing]   = useState(null);
+    const [toDelete,  setToDelete]  = useState(null);
 
     const load = async () => {
         setLoading(true);
+        setError('');
         try {
             const [p, c] = await Promise.all([getProjects(token), getClients(token)]);
             setProjects(p); setClients(c);
+        } catch {
+            setError('No se pudieron cargar los proyectos.');
         } finally { setLoading(false); }
     };
 
@@ -40,8 +49,18 @@ export default function Projects() {
     const handleEdit   = async d => { await updateProject(token, editing.id, d); setEditing(null); load(); };
     const handleDelete = async () => { await deleteProject(token, toDelete.id); setToDelete(null); load(); };
 
-    const openEdit = p => { setEditing(p); setShowForm(true); };
+    const openEdit  = p => { setEditing(p); setShowForm(true); };
     const closeModal = () => { setShowForm(false); setEditing(null); };
+
+    const filtered = projects.filter(p => {
+        const q = search.toLowerCase();
+        const matchSearch = !q ||
+            p.title.toLowerCase().includes(q) ||
+            (p.client_name || '').toLowerCase().includes(q) ||
+            (p.description || '').toLowerCase().includes(q);
+        const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+        return matchSearch && matchStatus;
+    });
 
     return (
         <div className="app-layout">
@@ -59,6 +78,38 @@ export default function Projects() {
                     </button>
                 </div>
 
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
+                )}
+
+                {/* ── BUSCADOR + FILTROS ── */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="search-bar" style={{ flex: '1 1 200px', minWidth: 200 }}>
+                        <Search size={14} className="search-bar-icon" />
+                        <input
+                            className="form-input"
+                            style={{ paddingLeft: 34 }}
+                            placeholder="Buscar por título, cliente o descripción…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {STATUS_FILTERS.map(f => (
+                            <button
+                                key={f}
+                                className={`filter-chip${statusFilter === f ? ' active' : ''}`}
+                                onClick={() => setStatusFilter(f)}
+                            >
+                                {STATUS_FILTER_LABEL[f]}
+                                <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>
+                                    {f === 'all' ? projects.length : projects.filter(p => p.status === f).length}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {/* ── TABLA ── */}
                 {loading ? (
                     <div className="table-wrap">
@@ -69,16 +120,21 @@ export default function Projects() {
                             </div>
                         ))}
                     </div>
-                ) : projects.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div className="table-wrap">
                         <div className="empty-state">
                             <div className="empty-icon"><FolderOpen size={22} /></div>
-                            <p className="empty-title">Sin proyectos</p>
-                            <p className="empty-desc">Crea tu primer proyecto y asócialo a un cliente existente</p>
-                            <button className="btn btn-primary" style={{ marginTop: 10 }}
-                                onClick={() => setShowForm(true)}>
-                                <Plus size={14} /> Nuevo proyecto
-                            </button>
+                            <p className="empty-title">{search || statusFilter !== 'all' ? 'Sin resultados' : 'Sin proyectos'}</p>
+                            <p className="empty-desc">
+                                {search || statusFilter !== 'all'
+                                    ? 'Prueba con otros términos o cambia el filtro de estado'
+                                    : 'Crea tu primer proyecto y asócialo a un cliente existente'}
+                            </p>
+                            {!search && statusFilter === 'all' && (
+                                <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setShowForm(true)}>
+                                    <Plus size={14} /> Nuevo proyecto
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -95,7 +151,7 @@ export default function Projects() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {projects.map((p, idx) => {
+                                {filtered.map((p, idx) => {
                                     const s = STATUS[p.status] || { label: p.status, cls: 'badge' };
                                     return (
                                         <tr key={p.id} style={{ animationDelay: `${idx * 25}ms` }}>

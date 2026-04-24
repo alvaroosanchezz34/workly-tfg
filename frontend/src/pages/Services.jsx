@@ -4,7 +4,7 @@ import { getServices, createService, updateService, deleteService } from '../api
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import ServiceForm from '../components/ServiceForm';
-import { Plus, Wrench } from 'lucide-react';
+import { Plus, Wrench, Search } from 'lucide-react';
 
 const fmt = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 
@@ -12,13 +12,17 @@ export default function Services() {
     const { token } = useContext(AuthContext);
     const [services, setServices] = useState([]);
     const [loading,  setLoading]  = useState(true);
+    const [error,    setError]    = useState('');
+    const [search,   setSearch]   = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editing,  setEditing]  = useState(null);
     const [toDelete, setToDelete] = useState(null);
 
     const load = async () => {
         setLoading(true);
+        setError('');
         try { setServices(await getServices(token)); }
+        catch { setError('No se pudieron cargar los servicios.'); }
         finally { setLoading(false); }
     };
 
@@ -29,6 +33,11 @@ export default function Services() {
     const handleDelete = async () => { await deleteService(token, toDelete.id); setToDelete(null); load(); };
     const closeModal   = () => { setShowForm(false); setEditing(null); };
 
+    const filtered = services.filter(s => {
+        const q = search.toLowerCase();
+        return !q || s.name.toLowerCase().includes(q) || (s.unit || '').toLowerCase().includes(q);
+    });
+
     return (
         <div className="app-layout">
             <Sidebar />
@@ -38,12 +47,32 @@ export default function Services() {
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Servicios</h1>
-                        <p className="page-subtitle">Catálogo de servicios y tarifas</p>
+                        <p className="page-subtitle">
+                            {services.length} servicio{services.length !== 1 ? 's' : ''} en el catálogo
+                        </p>
                     </div>
                     <button className="btn btn-primary" onClick={() => setShowForm(true)}>
                         <Plus size={15} /> Nuevo servicio
                     </button>
                 </div>
+
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
+                )}
+
+                {/* ── BUSCADOR ── */}
+                {services.length > 0 && (
+                    <div className="search-bar" style={{ marginBottom: 18 }}>
+                        <Search size={14} className="search-bar-icon" />
+                        <input
+                            className="form-input"
+                            style={{ paddingLeft: 34 }}
+                            placeholder="Buscar servicio por nombre o unidad…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                )}
 
                 {/* ── CONTENIDO ── */}
                 {loading ? (
@@ -55,21 +84,26 @@ export default function Services() {
                             </div>
                         ))}
                     </div>
-                ) : services.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div className="table-wrap">
                         <div className="empty-state">
                             <div className="empty-icon"><Wrench size={22} /></div>
-                            <p className="empty-title">Sin servicios</p>
-                            <p className="empty-desc">Define tus servicios y tarifas para usarlos rápidamente al crear facturas</p>
-                            <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setShowForm(true)}>
-                                <Plus size={14} /> Nuevo servicio
-                            </button>
+                            <p className="empty-title">{search ? 'Sin resultados' : 'Sin servicios'}</p>
+                            <p className="empty-desc">
+                                {search
+                                    ? 'Prueba con otro término de búsqueda'
+                                    : 'Define tus servicios y tarifas para usarlos rápidamente al crear facturas'}
+                            </p>
+                            {!search && (
+                                <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setShowForm(true)}>
+                                    <Plus size={14} /> Nuevo servicio
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
-                    /* Grid de cards — más apropiado para un catálogo de servicios */
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 14 }}>
-                        {services.map((s, i) => (
+                        {filtered.map((s, i) => (
                             <div
                                 key={s.id}
                                 className="card card-p"
@@ -77,7 +111,6 @@ export default function Services() {
                                 onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = ''; }}
                             >
-                                {/* cabecera card */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                                     <div style={{ width: 38, height: 38, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Wrench size={17} color="var(--primary)" />

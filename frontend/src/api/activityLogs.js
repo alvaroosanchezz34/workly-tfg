@@ -1,13 +1,9 @@
 import { fetchWithAuth } from '../context/fetchWithAuth';
 
 export const getActivityLogs = async (token) => {
-    const res = await fetch(
+    const res = await fetchWithAuth(
         `${import.meta.env.VITE_API_URL}/activity-logs`,
-        {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        }
+        token
     );
 
     if (!res.ok) {

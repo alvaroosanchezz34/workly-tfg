@@ -18,7 +18,7 @@ const STATUS_META = {
 };
 
 const SkeletonRow = () => (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:24 }}>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}>
         {[...Array(5)].map((_,i) => (
             <div key={i} className="metric-card" style={{ height:96 }}>
                 <div className="skeleton" style={{ height:11, width:'45%', marginBottom:14 }} />
@@ -32,10 +32,16 @@ const Dashboard = () => {
     const { token, user } = useContext(AuthContext);
     const [data,    setData]    = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error,   setError]   = useState('');
 
     useEffect(() => {
         if (!token) return;
-        getDashboard(token).then(setData).finally(() => setLoading(false));
+        setLoading(true);
+        setError('');
+        getDashboard(token)
+            .then(setData)
+            .catch(() => setError('No se pudieron cargar los datos del dashboard.'))
+            .finally(() => setLoading(false));
     }, [token]);
 
     return (
@@ -55,6 +61,10 @@ const Dashboard = () => {
                     </div>
                 </div>
 
+                {error && (
+                    <AlertBox type="danger" title="Error" description={error} />
+                )}
+
                 {loading ? <SkeletonRow /> : (
                     <>
                         {/* ALERTAS */}
@@ -71,8 +81,8 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {/* MÉTRICAS */}
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:24 }}>
+                        {/* MÉTRICAS — grid de 5 columnas para que queden iguales */}
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}>
                             <MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} />
                             <MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} />
                             <MetricCard title="Beneficio neto"    value={fmt(data?.profit)}    accentColor={(data?.profit ?? 0) >= 0 ? '#1976D2' : '#F44336'} icon={<DollarSign size={16}/>} />

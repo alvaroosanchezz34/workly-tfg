@@ -28,10 +28,17 @@ export default function ActivityLogs() {
     const { token } = useContext(AuthContext);
     const [logs,    setLogs]    = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error,   setError]   = useState('');
 
     useEffect(() => {
-        getActivityLogs(token).then(setLogs).finally(() => setLoading(false));
-    }, []);
+        if (!token) return;
+        setLoading(true);
+        setError('');
+        getActivityLogs(token)
+            .then(setLogs)
+            .catch(() => setError('No se pudo cargar el registro de actividad.'))
+            .finally(() => setLoading(false));
+    }, [token]);
 
     return (
         <div className="app-layout">
@@ -44,6 +51,10 @@ export default function ActivityLogs() {
                         <p className="page-subtitle">Historial de acciones realizadas en el sistema</p>
                     </div>
                 </div>
+
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
+                )}
 
                 {loading ? (
                     <div className="table-wrap">

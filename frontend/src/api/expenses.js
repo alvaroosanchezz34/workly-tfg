@@ -1,20 +1,16 @@
+import { fetchWithAuth } from '../context/fetchWithAuth';
+
 const API_URL = `${import.meta.env.VITE_API_URL}/expenses`;
 
 export const getExpenses = async (token) => {
-    const res = await fetch(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetchWithAuth(API_URL, token);
     if (!res.ok) throw new Error('Error al cargar gastos');
     return res.json();
 };
 
 export const createExpense = async (token, data) => {
-    const res = await fetch(API_URL, {
+    const res = await fetchWithAuth(API_URL, token, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Error al crear gasto');
@@ -22,12 +18,8 @@ export const createExpense = async (token, data) => {
 };
 
 export const updateExpense = async (token, id, data) => {
-    const res = await fetch(`${API_URL}/${id}`, {
+    const res = await fetchWithAuth(`${API_URL}/${id}`, token, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Error al actualizar gasto');
@@ -35,9 +27,8 @@ export const updateExpense = async (token, id, data) => {
 };
 
 export const deleteExpense = async (token, id) => {
-    const res = await fetch(`${API_URL}/${id}`, {
+    const res = await fetchWithAuth(`${API_URL}/${id}`, token, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Error al eliminar gasto');
     return true;

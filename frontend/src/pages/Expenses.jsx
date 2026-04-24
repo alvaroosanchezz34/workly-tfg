@@ -4,12 +4,11 @@ import { getExpenses, createExpense, updateExpense, deleteExpense } from '../api
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import ExpenseForm from '../components/ExpenseForm';
-import { Plus, TrendingDown } from 'lucide-react';
+import { Plus, TrendingDown, Search } from 'lucide-react';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-/* Color por categoría — usando palette oficial */
 const CAT_COLOR = {
     software:   { bg: 'var(--primary-light)',    color: 'var(--primary)'   },
     hardware:   { bg: '#F3E5F5',                 color: '#7B1FA2'          },
@@ -21,17 +20,28 @@ const CAT_COLOR = {
     otros:      { bg: '#F5F5F5',                 color: '#616161'          },
 };
 
+const CAT_LABELS = {
+    software: 'Software', hardware: 'Hardware', oficina: 'Oficina',
+    transporte: 'Transporte', marketing: 'Marketing', formacion: 'Formación',
+    servicios: 'Servicios', otros: 'Otros',
+};
+
 export default function Expenses() {
     const { token } = useContext(AuthContext);
-    const [expenses, setExpenses] = useState([]);
-    const [loading,  setLoading]  = useState(true);
-    const [showForm, setShowForm] = useState(false);
-    const [editing,  setEditing]  = useState(null);
-    const [toDelete, setToDelete] = useState(null);
+    const [expenses,   setExpenses]   = useState([]);
+    const [loading,    setLoading]    = useState(true);
+    const [error,      setError]      = useState('');
+    const [search,     setSearch]     = useState('');
+    const [catFilter,  setCatFilter]  = useState('all');
+    const [showForm,   setShowForm]   = useState(false);
+    const [editing,    setEditing]    = useState(null);
+    const [toDelete,   setToDelete]   = useState(null);
 
     const load = async () => {
         setLoading(true);
+        setError('');
         try { setExpenses(await getExpenses(token)); }
+        catch { setError('No se pudieron cargar los gastos.'); }
         finally { setLoading(false); }
     };
 
@@ -42,7 +52,20 @@ export default function Expenses() {
     const handleDelete = async () => { await deleteExpense(token, toDelete.id); setToDelete(null); load(); };
     const closeModal   = () => { setShowForm(false); setEditing(null); };
 
-    const total = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const filtered = expenses.filter(e => {
+        const q = search.toLowerCase();
+        const matchSearch = !q ||
+            (e.description || '').toLowerCase().includes(q) ||
+            (e.category || '').toLowerCase().includes(q);
+        const matchCat = catFilter === 'all' || e.category === catFilter;
+        return matchSearch && matchCat;
+    });
+
+    const total         = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);
+
+    // Categorías que tienen al menos 1 gasto
+    const usedCats = [...new Set(expenses.map(e => e.category).filter(Boolean))];
 
     return (
         <div className="app-layout">
@@ -54,12 +77,59 @@ export default function Expenses() {
                     <div>
                         <h1 className="page-title">Gastos</h1>
                         <p className="page-subtitle">
-                            {expenses.length} registro{expenses.length !== 1 ? 's' : ''} · Total: <span style={{ color: 'var(--error)', fontWeight: 600 }}>{fmt(total)}</span>
+                            {expenses.length} registro{expenses.length !== 1 ? 's' : ''} · Total:{' '}
+                            <span style={{ color: 'var(--error)', fontWeight: 600 }}>{fmt(total)}</span>
+                            {(search || catFilter !== 'all') && (
+                                <span style={{ color: 'var(--text-disabled)' }}>
+                                    {' '}· Filtrado: <span style={{ color: 'var(--error)', fontWeight: 600 }}>{fmt(totalFiltered)}</span>
+                                </span>
+                            )}
                         </p>
                     </div>
                     <button className="btn btn-primary" onClick={() => setShowForm(true)}>
                         <Plus size={15} /> Nuevo gasto
                     </button>
+                </div>
+
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
+                )}
+
+                {/* ── BUSCADOR + FILTRO CATEGORÍA ── */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="search-bar" style={{ flex: '1 1 200px', minWidth: 200 }}>
+                        <Search size={14} className="search-bar-icon" />
+                        <input
+                            className="form-input"
+                            style={{ paddingLeft: 34 }}
+                            placeholder="Buscar por descripción o categoría…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    {usedCats.length > 1 && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button
+                                className={`filter-chip${catFilter === 'all' ? ' active' : ''}`}
+                                onClick={() => setCatFilter('all')}
+                            >
+                                Todas
+                                <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>{expenses.length}</span>
+                            </button>
+                            {usedCats.map(cat => (
+                                <button
+                                    key={cat}
+                                    className={`filter-chip${catFilter === cat ? ' active' : ''}`}
+                                    onClick={() => setCatFilter(cat)}
+                                >
+                                    {CAT_LABELS[cat] || cat}
+                                    <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>
+                                        {expenses.filter(e => e.category === cat).length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* ── TABLA ── */}
@@ -72,15 +142,23 @@ export default function Expenses() {
                             </div>
                         ))}
                     </div>
-                ) : expenses.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div className="table-wrap">
                         <div className="empty-state">
                             <div className="empty-icon"><TrendingDown size={22} /></div>
-                            <p className="empty-title">Sin gastos registrados</p>
-                            <p className="empty-desc">Registra tus gastos para llevar un control financiero preciso</p>
-                            <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setShowForm(true)}>
-                                <Plus size={14} /> Nuevo gasto
-                            </button>
+                            <p className="empty-title">
+                                {search || catFilter !== 'all' ? 'Sin resultados' : 'Sin gastos registrados'}
+                            </p>
+                            <p className="empty-desc">
+                                {search || catFilter !== 'all'
+                                    ? 'Prueba con otros términos o cambia la categoría'
+                                    : 'Registra tus gastos para llevar un control financiero preciso'}
+                            </p>
+                            {!search && catFilter === 'all' && (
+                                <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setShowForm(true)}>
+                                    <Plus size={14} /> Nuevo gasto
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -96,11 +174,11 @@ export default function Expenses() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {expenses.map((e, idx) => {
+                                {filtered.map((e, idx) => {
                                     const cat = CAT_COLOR[e.category] || CAT_COLOR.otros;
-                                    const catLabel = e.category
+                                    const catLabel = CAT_LABELS[e.category] || (e.category
                                         ? e.category.charAt(0).toUpperCase() + e.category.slice(1)
-                                        : '—';
+                                        : '—');
                                     return (
                                         <tr key={e.id} style={{ animationDelay: `${idx * 22}ms` }}>
                                             <td>

@@ -1,10 +1,11 @@
 import { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ClientForm from '../components/ClientForm';
 import Modal from '../components/Modal';
 import { getClients, createClient, updateClient, deleteClient } from '../api/clients';
-import { Plus, Search, Users, Building2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Users, Building2, Mail, Phone, ChevronRight } from 'lucide-react';
 
 const COLORS = ['#1976D2','#4CAF50','#FF9800','#0288D1','#9C27B0','#F44336'];
 const colorFor = id => COLORS[id % COLORS.length];
@@ -12,6 +13,7 @@ const initials = name => name?.split(' ').slice(0,2).map(w=>w[0]).join('').toUpp
 
 const Clients = () => {
     const { token } = useContext(AuthContext);
+    const navigate = useNavigate();
     const [clients,  setClients]  = useState([]);
     const [filtered, setFiltered] = useState([]);
     const [loading,  setLoading]  = useState(true);
@@ -33,13 +35,17 @@ const Clients = () => {
         setFiltered(clients.filter(c =>
             c.name.toLowerCase().includes(q) ||
             (c.email||'').toLowerCase().includes(q) ||
-            (c.company||'').toLowerCase().includes(q)
+            (c.company||'').toLowerCase().includes(q) ||
+            (c.phone||'').toLowerCase().includes(q)
         ));
     }, [search, clients]);
 
     const handleCreate = async f => { await createClient(token, f); setShowForm(false); load(); };
     const handleEdit   = async f => { await updateClient(token, editing.id, f); setEditing(null); load(); };
     const handleDelete = async () => { await deleteClient(token, toDelete.id); setToDelete(null); load(); };
+
+    const openEdit = (e, c) => { e.stopPropagation(); setEditing(c); };
+    const openDelete = (e, c) => { e.stopPropagation(); setToDelete(c); };
 
     return (
         <div className="app-layout">
@@ -60,7 +66,7 @@ const Clients = () => {
                 <div className="search-bar" style={{ marginBottom:18 }}>
                     <Search size={14} className="search-bar-icon"/>
                     <input className="form-input" style={{ paddingLeft:34 }}
-                        placeholder="Buscar por nombre, email o empresa…"
+                        placeholder="Buscar por nombre, email, empresa o teléfono…"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
 
@@ -99,14 +105,21 @@ const Clients = () => {
                             </thead>
                             <tbody>
                                 {filtered.map((c, idx) => (
-                                    <tr key={c.id} style={{ animationDelay:`${idx*25}ms` }}>
+                                    <tr
+                                        key={c.id}
+                                        style={{ animationDelay:`${idx*25}ms`, cursor:'pointer' }}
+                                        onClick={() => navigate(`/clients/${c.id}`)}
+                                    >
                                         <td>
                                             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                                                 <div style={{ width:36, height:36, borderRadius:8, background:`${colorFor(c.id)}14`, color:colorFor(c.id), display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:600, flexShrink:0 }}>
                                                     {initials(c.name)}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight:500 }}>{c.name}</div>
+                                                    <div style={{ fontWeight:500, display:'flex', alignItems:'center', gap:5 }}>
+                                                        {c.name}
+                                                        <ChevronRight size={12} style={{ color:'var(--text-disabled)' }} />
+                                                    </div>
                                                     {c.document && <div style={{ fontSize:11.5, color:'var(--text-disabled)' }}>{c.document}</div>}
                                                 </div>
                                             </div>
@@ -123,8 +136,8 @@ const Clients = () => {
                                             </div>
                                         </td>
                                         <td style={{ textAlign:'right' }}>
-                                            <button className="action-link action-link-primary" onClick={() => setEditing(c)}>Editar</button>
-                                            <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(c)}>Eliminar</button>
+                                            <button className="action-link action-link-primary" onClick={e => openEdit(e, c)}>Editar</button>
+                                            <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={e => openDelete(e, c)}>Eliminar</button>
                                         </td>
                                     </tr>
                                 ))}
