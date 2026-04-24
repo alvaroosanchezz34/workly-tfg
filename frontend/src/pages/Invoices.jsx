@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { fetchWithAuth } from '../context/fetchWithAuth';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import InvoiceForm from '../components/InvoiceForm';
@@ -17,7 +18,7 @@ import {
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
 import { getServices } from '../api/services';
-import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown } from 'lucide-react';
+import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown, Send, Mail } from 'lucide-react';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -186,6 +187,12 @@ export default function Invoices() {
     const [previewInv,   setPreviewInv]   = useState(null);
     const [downloading,  setDownloading]  = useState(null);
 
+    // Email
+    const [showSend,  setShowSend]  = useState(null);
+    const [sendEmail, setSendEmail] = useState('');
+    const [sending,   setSending]   = useState(false);
+    const [sendOk,    setSendOk]    = useState('');
+
     const [filters, setFilters] = useState({
         status: '', client_id: '', date_from: '', date_to: '', min_amount: '', max_amount: '',
     });
@@ -235,6 +242,32 @@ export default function Invoices() {
     const handlePreview = async inv => {
         try { setPreviewInv(await getInvoiceById(token, inv.id)); }
         catch { alert('Error al cargar factura'); }
+    };
+
+    const openSendModal = async inv => {
+        try {
+            const full = await getInvoiceById(token, inv.id);
+            setSendEmail(full.client_email || '');
+            setSendOk('');
+            setShowSend(full);
+        } catch { setSendEmail(''); setSendOk(''); setShowSend(inv); }
+    };
+
+    const handleSendEmail = async () => {
+        if (!sendEmail.trim()) return alert('Introduce un email destinatario');
+        setSending(true);
+        try {
+            const res  = await fetchWithAuth(
+                `${import.meta.env.VITE_API_URL}/invoices/${showSend.id}/send`,
+                token,
+                { method: 'POST', body: JSON.stringify({ to: sendEmail.trim() }) }
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            setSendOk(data.message);
+            load();
+        } catch (err) { alert(`Error: ${err.message}`); }
+        finally { setSending(false); }
     };
 
     const totalAll     = invoices.reduce((s, i) => s + Number(i.total_amount   || 0), 0);
@@ -376,6 +409,11 @@ export default function Invoices() {
                                                             onClick={() => handleDownload(inv)}>
                                                             <Download size={13} />
                                                         </button>
+                                                        <button className="btn-icon" title="Enviar por email"
+                                                            style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 4 }}
+                                                            onClick={() => openSendModal(inv)}>
+                                                            <Send size={13} />
+                                                        </button>
                                                         <button className="action-link action-link-danger" style={{ marginLeft: 4 }} onClick={() => setToDelete(inv)}>
                                                             Eliminar
                                                         </button>
@@ -434,6 +472,54 @@ export default function Invoices() {
                     <InvoicePreview invoice={previewInv} />
                 </Modal>
             )}
+
+            {/* MODAL ENVIAR POR EMAIL */}
+            <Modal open={!!showSend} title={`Enviar — ${showSend?.invoice_number || ''}`} onClose={() => { setShowSend(null); setSendOk(''); }}>
+                {sendOk ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <div style={{ fontSize: 44, marginBottom: 12 }}>✅</div>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Factura enviada</h3>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>{sendOk}</p>
+                        <button className="btn btn-primary" onClick={() => { setShowSend(null); setSendOk(''); }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+                            Se enviará un email con el PDF adjunto. Si la factura está en borrador pasará a <strong>Enviada</strong> automáticamente.
+                        </p>
+                        <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>{showSend?.invoice_number}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{showSend?.client_name}</div>
+                            </div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary)' }}>{showSend ? fmt(showSend.total_amount) : ''}</div>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 20 }}>
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <Mail size={12} /> Destinatario *
+                            </label>
+                            <input type="email" className="form-input" value={sendEmail}
+                                onChange={e => setSendEmail(e.target.value)}
+                                placeholder="email@cliente.com"
+                                onKeyDown={e => e.key === 'Enter' && handleSendEmail()} />
+                            {showSend && !showSend.client_email && (
+                                <span style={{ fontSize: 11.5, color: 'var(--warning)', marginTop: 4, display: 'block' }}>
+                                    ⚠️ El cliente no tiene email registrado. Introdúcelo manualmente.
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                            <button className="btn btn-ghost" onClick={() => setShowSend(null)}>Cancelar</button>
+                            <button className="btn btn-primary" onClick={handleSendEmail}
+                                disabled={sending || !sendEmail.trim()}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Send size={14} />
+                                {sending ? 'Enviando…' : 'Enviar factura'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 }

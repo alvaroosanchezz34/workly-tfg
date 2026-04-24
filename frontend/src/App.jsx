@@ -4,6 +4,7 @@ import { UIProvider, UIContext } from './context/UIContext';
 import { useContext } from 'react';
 
 import Login          from './pages/Login';
+import Register       from './pages/Register';
 import Dashboard      from './pages/DashBoard';
 import Clients        from './pages/Clients';
 import ClientProfile  from './pages/ClientProfile';
@@ -15,18 +16,19 @@ import Expenses       from './pages/Expenses';
 import Projects       from './pages/Projects';
 import Invoices       from './pages/Invoices';
 import PublicInvoice  from './pages/PublicInvoice';
+import Team           from './pages/Team';
+import CompanySetup   from './pages/CompanySetup';
 
 const PrivateRoute = ({ children }) => {
     const { token, isAuthenticated } = useContext(AuthContext);
     return isAuthenticated || token ? children : <Navigate to="/" replace />;
 };
 
-// Panel de notificaciones inline — sin imports extra
 const NotifPanel = () => {
     const { token } = useContext(AuthContext);
     const { notifOpen, closeNotif, notifications, markAllRead } = useContext(UIContext);
     if (!notifOpen || !token) return null;
-    const TYPE_COLOR = { overdue: '#F44336', warning: '#FF9800', info: '#1976D2' };
+    const COLOR = { overdue: '#F44336', warning: '#FF9800', info: '#1976D2' };
     return (
         <div style={{ position: 'fixed', bottom: 80, left: 270, width: 320, background: 'var(--card-bg, #fff)', border: '1.5px solid var(--border, #E0E0E0)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 9999, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border, #E0E0E0)' }}>
@@ -37,17 +39,18 @@ const NotifPanel = () => {
                 </div>
             </div>
             <div style={{ maxHeight: 340, overflowY: 'auto' }}>
-                {notifications.length === 0 ? (
-                    <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9E9E9E', fontSize: 13 }}>✓ Todo al día</div>
-                ) : notifications.map(n => (
-                    <div key={n.id} style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border, #F0F0F0)', background: n.read ? 'transparent' : 'rgba(25,118,210,0.04)', cursor: 'pointer' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_COLOR[n.type] || '#1976D2', flexShrink: 0, marginTop: 5 }} />
-                        <div>
-                            <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
-                            <div style={{ fontSize: 12, color: '#616161', marginTop: 2 }}>{n.body}</div>
+                {notifications.length === 0
+                    ? <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9E9E9E', fontSize: 13 }}>✓ Todo al día</div>
+                    : notifications.map(n => (
+                        <div key={n.id} style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border, #F0F0F0)', background: n.read ? 'transparent' : 'rgba(25,118,210,0.04)' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLOR[n.type] || '#1976D2', flexShrink: 0, marginTop: 5 }} />
+                            <div>
+                                <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
+                                <div style={{ fontSize: 12, color: '#616161', marginTop: 2 }}>{n.body}</div>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                }
             </div>
         </div>
     );
@@ -56,8 +59,9 @@ const NotifPanel = () => {
 const AppInner = () => (
     <UIProvider>
         <Routes>
-            <Route path="/"                element={<Login />} />
-            <Route path="/p/:token"        element={<PublicInvoice />} />
+            <Route path="/"             element={<Login />} />
+            <Route path="/register"     element={<Register />} />
+            <Route path="/p/:token"     element={<PublicInvoice />} />
             <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
             <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
@@ -68,6 +72,8 @@ const AppInner = () => (
             <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
             <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
+            <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
+            <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
             <Route path="*"                element={<Navigate to="/" replace />} />
         </Routes>
         <NotifPanel />
