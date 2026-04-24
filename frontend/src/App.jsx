@@ -5,7 +5,7 @@ import { useContext } from 'react';
 
 import Login          from './pages/Login';
 import Register       from './pages/Register';
-import Dashboard      from './pages/DashBoard';
+import Dashboard      from './pages/Dashboard';
 import Clients        from './pages/Clients';
 import ClientProfile  from './pages/ClientProfile';
 import Profile        from './pages/Profile';
