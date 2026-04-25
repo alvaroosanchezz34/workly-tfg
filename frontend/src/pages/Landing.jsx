@@ -145,7 +145,7 @@ export default function Landing() {
                 height: 64,
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#1976D2,#FF9800)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#fff' }}>W</div>
+                    <img src="/logo.png" alt="Workly" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover' }} />
                     <span style={{ fontWeight: 800, fontSize: 17, color: scrolled ? '#0F1117' : '#fff', letterSpacing: '0.02em' }}>Workly</span>
                 </div>
 
@@ -411,7 +411,7 @@ export default function Landing() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 40, marginBottom: 48 }}>
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                                <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1976D2,#FF9800)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>W</div>
+                                <img src="/logo.png" alt="Workly" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover' }} />
                                 <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>Workly</span>
                             </div>
                             <p style={{ fontSize: 13.5, lineHeight: 1.7 }}>Simplifica la gestión de tu negocio como freelance o pequeño emprendedor.</p>

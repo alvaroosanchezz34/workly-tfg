@@ -38,7 +38,7 @@ export default function Sidebar() {
 
             {/* LOGO */}
             <div className="sidebar-logo">
-                <div className="sidebar-logo-icon">W</div>
+                <img src="/logo.png" alt="Workly" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="sidebar-logo-name">WORKLY</div>
                     <div className="sidebar-logo-sub">Gestión freelance</div>

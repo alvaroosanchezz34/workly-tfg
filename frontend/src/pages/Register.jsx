@@ -54,7 +54,7 @@ export default function Register() {
 
                 {/* Logo */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-                    <div className="sidebar-logo-icon">W</div>
+                    <img src="/logo.png" alt="Workly" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
                     <div>
                         <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>WORKLY</div>
                         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Gestión freelance</div>
