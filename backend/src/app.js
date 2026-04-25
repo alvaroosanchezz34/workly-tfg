@@ -18,7 +18,8 @@ import servicesRoutes        from './routes/services.routes.js';
 import companyRoutes         from './routes/company.routes.js';
 import usersRoutes           from './routes/users.routes.js';
 import exportRoutes          from './routes/export.routes.js';
-import billingRoutes         from './routes/billing.routes.js';
+import { stripeWebhook, getPlans, getBillingStatus, createCheckout, createPortal } from './controllers/billing.controller.js';
+import { authenticate } from './middlewares/auth.middleware.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -41,11 +42,19 @@ const authLimiter    = rateLimit({ windowMs: 15*60*1000, max: 20,  message: { me
 app.use(generalLimiter);
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Billing ANTES del json parser (webhook necesita raw body)
-app.use('/api/billing', billingRoutes);
+// ⚠️ Webhook de Stripe ANTES del json parser (necesita raw body)
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
+// JSON parser para el resto
 app.use(express.json({ limit: '2mb' }));
 
+// Rutas de billing (ya con json parseado)
+app.get('/api/billing/plans',    getPlans);
+app.get('/api/billing/status',   authenticate, getBillingStatus);
+app.post('/api/billing/checkout', authenticate, createCheckout);
+app.post('/api/billing/portal',   authenticate, createPortal);
+
+// Resto de rutas
 app.use('/api/auth',               authLimiter, authRoutes);
 app.use('/api/users',              usersRoutes);
 app.use('/api/company',            companyRoutes);
