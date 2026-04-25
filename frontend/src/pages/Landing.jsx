@@ -441,8 +441,8 @@ export default function Landing() {
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, fontSize: 13 }}>
                         <span>© {new Date().getFullYear()} Workly. Todos los derechos reservados.</span>
                         <div style={{ display: 'flex', gap: 20 }}>
-                            <span style={{ cursor: 'pointer' }}>Política de privacidad</span>
-                            <span style={{ cursor: 'pointer' }}>Términos y condiciones</span>
+                            <Link to="/privacidad" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>Política de privacidad</Link>
+                            <Link to="/estado" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>Estado del sistema</Link>
                         </div>
                     </div>
                 </div>

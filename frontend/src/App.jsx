@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UIProvider, UIContext } from './context/UIContext';
-import { useContext } from 'react';
+import { useContext, useState, useEffect } from 'react';
 
 import Landing        from './pages/Landing';
 import Login          from './pages/Login';
@@ -19,12 +19,18 @@ import Invoices       from './pages/Invoices';
 import PublicInvoice  from './pages/PublicInvoice';
 import Team           from './pages/Team';
 import CompanySetup   from './pages/CompanySetup';
+import Privacidad     from './pages/Privacidad';
+import Estado         from './pages/Estado';
+
+import CookieBanner        from './components/CookieBanner';
+import OnboardingChecklist from './components/OnboardingChecklist';
 
 const PrivateRoute = ({ children }) => {
     const { token, isAuthenticated } = useContext(AuthContext);
     return isAuthenticated || token ? children : <Navigate to="/login" replace />;
 };
 
+// Panel de notificaciones inline
 const NotifPanel = () => {
     const { token } = useContext(AuthContext);
     const { notifOpen, closeNotif, notifications, markAllRead } = useContext(UIContext);
@@ -57,14 +63,44 @@ const NotifPanel = () => {
     );
 };
 
+// Onboarding — solo en páginas privadas, solo primera vez
+const OnboardingWrapper = () => {
+    const { token, isAuthenticated } = useContext(AuthContext);
+    const location = useLocation();
+    const [show, setShow] = useState(false);
+
+    const PUBLIC_PATHS = ['/', '/login', '/register', '/privacidad', '/estado'];
+    const isPublic = PUBLIC_PATHS.includes(location.pathname) || location.pathname.startsWith('/p/');
+
+    useEffect(() => {
+        if (!token || !isAuthenticated || isPublic) return;
+        const dismissed = localStorage.getItem('workly_onboarding_dismissed');
+        const done = JSON.parse(localStorage.getItem('workly_onboarding') || '[]');
+        if (!dismissed && done.length < 5) {
+            const t = setTimeout(() => setShow(true), 1200);
+            return () => clearTimeout(t);
+        }
+    }, [token, isAuthenticated, location.pathname]);
+
+    const close = () => {
+        setShow(false);
+        localStorage.setItem('workly_onboarding_dismissed', '1');
+    };
+
+    if (!show) return null;
+    return <OnboardingChecklist onClose={close} />;
+};
+
 const AppInner = () => (
     <UIProvider>
         <Routes>
-            {/* Landing y auth */}
-            <Route path="/"          element={<Landing />} />
-            <Route path="/login"     element={<Login />} />
-            <Route path="/register"  element={<Register />} />
-            <Route path="/p/:token"  element={<PublicInvoice />} />
+            {/* Públicas */}
+            <Route path="/"           element={<Landing />} />
+            <Route path="/login"      element={<Login />} />
+            <Route path="/register"   element={<Register />} />
+            <Route path="/privacidad" element={<Privacidad />} />
+            <Route path="/estado"     element={<Estado />} />
+            <Route path="/p/:token"   element={<PublicInvoice />} />
 
             {/* Protegidas */}
             <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -82,7 +118,11 @@ const AppInner = () => (
 
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
+        {/* Globales */}
         <NotifPanel />
+        <OnboardingWrapper />
+        <CookieBanner />
     </UIProvider>
 );
 
