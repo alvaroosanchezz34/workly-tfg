@@ -21,6 +21,8 @@ import Team           from './pages/Team';
 import CompanySetup   from './pages/CompanySetup';
 import Privacidad     from './pages/Privacidad';
 import Estado         from './pages/Estado';
+import Billing        from './pages/Billing';
+import BillingSuccess from './pages/BillingSuccess';
 
 import CookieBanner        from './components/CookieBanner';
 import OnboardingChecklist from './components/OnboardingChecklist';
@@ -30,7 +32,6 @@ const PrivateRoute = ({ children }) => {
     return isAuthenticated || token ? children : <Navigate to="/login" replace />;
 };
 
-// Panel de notificaciones inline
 const NotifPanel = () => {
     const { token } = useContext(AuthContext);
     const { notifOpen, closeNotif, notifications, markAllRead } = useContext(UIContext);
@@ -63,13 +64,12 @@ const NotifPanel = () => {
     );
 };
 
-// Onboarding — solo en páginas privadas, solo primera vez
 const OnboardingWrapper = () => {
     const { token, isAuthenticated } = useContext(AuthContext);
     const location = useLocation();
     const [show, setShow] = useState(false);
 
-    const PUBLIC_PATHS = ['/', '/login', '/register', '/privacidad', '/estado'];
+    const PUBLIC_PATHS = ['/', '/login', '/register', '/privacidad', '/estado', '/billing', '/billing/success'];
     const isPublic = PUBLIC_PATHS.includes(location.pathname) || location.pathname.startsWith('/p/');
 
     useEffect(() => {
@@ -82,11 +82,7 @@ const OnboardingWrapper = () => {
         }
     }, [token, isAuthenticated, location.pathname]);
 
-    const close = () => {
-        setShow(false);
-        localStorage.setItem('workly_onboarding_dismissed', '1');
-    };
-
+    const close = () => { setShow(false); localStorage.setItem('workly_onboarding_dismissed', '1'); };
     if (!show) return null;
     return <OnboardingChecklist onClose={close} />;
 };
@@ -95,31 +91,32 @@ const AppInner = () => (
     <UIProvider>
         <Routes>
             {/* Públicas */}
-            <Route path="/"           element={<Landing />} />
-            <Route path="/login"      element={<Login />} />
-            <Route path="/register"   element={<Register />} />
-            <Route path="/privacidad" element={<Privacidad />} />
-            <Route path="/estado"     element={<Estado />} />
-            <Route path="/p/:token"   element={<PublicInvoice />} />
+            <Route path="/"                  element={<Landing />} />
+            <Route path="/login"             element={<Login />} />
+            <Route path="/register"          element={<Register />} />
+            <Route path="/privacidad"        element={<Privacidad />} />
+            <Route path="/estado"            element={<Estado />} />
+            <Route path="/p/:token"          element={<PublicInvoice />} />
 
             {/* Protegidas */}
-            <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
-            <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
-            <Route path="/clients/:id"     element={<PrivateRoute><ClientProfile /></PrivateRoute>} />
-            <Route path="/projects"        element={<PrivateRoute><Projects /></PrivateRoute>} />
-            <Route path="/invoices"        element={<PrivateRoute><Invoices /></PrivateRoute>} />
-            <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
-            <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
-            <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
-            <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
-            <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
-            <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
+            <Route path="/dashboard"         element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/clients"           element={<PrivateRoute><Clients /></PrivateRoute>} />
+            <Route path="/clients/deleted"   element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
+            <Route path="/clients/:id"       element={<PrivateRoute><ClientProfile /></PrivateRoute>} />
+            <Route path="/projects"          element={<PrivateRoute><Projects /></PrivateRoute>} />
+            <Route path="/invoices"          element={<PrivateRoute><Invoices /></PrivateRoute>} />
+            <Route path="/expenses"          element={<PrivateRoute><Expenses /></PrivateRoute>} />
+            <Route path="/services"          element={<PrivateRoute><Services /></PrivateRoute>} />
+            <Route path="/profile"           element={<PrivateRoute><Profile /></PrivateRoute>} />
+            <Route path="/activity"          element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
+            <Route path="/team"              element={<PrivateRoute><Team /></PrivateRoute>} />
+            <Route path="/company/setup"     element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
+            <Route path="/billing"           element={<PrivateRoute><Billing /></PrivateRoute>} />
+            <Route path="/billing/success"   element={<PrivateRoute><BillingSuccess /></PrivateRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Globales */}
         <NotifPanel />
         <OnboardingWrapper />
         <CookieBanner />
