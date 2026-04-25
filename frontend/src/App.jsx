@@ -3,6 +3,7 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UIProvider, UIContext } from './context/UIContext';
 import { useContext } from 'react';
 
+import Landing        from './pages/Landing';
 import Login          from './pages/Login';
 import Register       from './pages/Register';
 import Dashboard      from './pages/Dashboard';
@@ -21,7 +22,7 @@ import CompanySetup   from './pages/CompanySetup';
 
 const PrivateRoute = ({ children }) => {
     const { token, isAuthenticated } = useContext(AuthContext);
-    return isAuthenticated || token ? children : <Navigate to="/" replace />;
+    return isAuthenticated || token ? children : <Navigate to="/login" replace />;
 };
 
 const NotifPanel = () => {
@@ -59,9 +60,13 @@ const NotifPanel = () => {
 const AppInner = () => (
     <UIProvider>
         <Routes>
-            <Route path="/"             element={<Login />} />
-            <Route path="/register"     element={<Register />} />
-            <Route path="/p/:token"     element={<PublicInvoice />} />
+            {/* Landing y auth */}
+            <Route path="/"          element={<Landing />} />
+            <Route path="/login"     element={<Login />} />
+            <Route path="/register"  element={<Register />} />
+            <Route path="/p/:token"  element={<PublicInvoice />} />
+
+            {/* Protegidas */}
             <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
             <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
@@ -74,7 +79,8 @@ const AppInner = () => (
             <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
             <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
             <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
-            <Route path="*"                element={<Navigate to="/" replace />} />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <NotifPanel />
     </UIProvider>
