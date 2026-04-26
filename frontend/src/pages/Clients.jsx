@@ -6,6 +6,7 @@ import ClientForm from '../components/ClientForm';
 import Modal from '../components/Modal';
 import { getClients, createClient, updateClient, deleteClient } from '../api/clients';
 import { Plus, Search, Users, Building2, Mail, Phone, ChevronRight } from 'lucide-react';
+import { usePlanLimit } from '../hooks/usePlanLimit';
 
 const COLORS = ['#1976D2','#4CAF50','#FF9800','#0288D1','#9C27B0','#F44336'];
 const colorFor = id => COLORS[id % COLORS.length];
@@ -21,6 +22,7 @@ const Clients = () => {
     const [showForm, setShowForm] = useState(false);
     const [editing,  setEditing]  = useState(null);
     const [toDelete, setToDelete] = useState(null);
+    const { checkResponse, UpgradePrompt } = usePlanLimit();
 
     const load = async () => {
         setLoading(true);
@@ -40,7 +42,12 @@ const Clients = () => {
         ));
     }, [search, clients]);
 
-    const handleCreate = async f => { await createClient(token, f); setShowForm(false); load(); };
+    const handleCreate = async f => {
+        const res = await createClient(token, f);
+        if (!await checkResponse(res)) return;
+        if (!res.ok) { const d = await res.json(); return alert(d.message); }
+        setShowForm(false); load();
+    };
     const handleEdit   = async f => { await updateClient(token, editing.id, f); setEditing(null); load(); };
     const handleDelete = async () => { await deleteClient(token, toDelete.id); setToDelete(null); load(); };
 
@@ -161,6 +168,7 @@ const Clients = () => {
                     <button className="btn btn-danger" onClick={handleDelete}>Eliminar</button>
                 </div>
             </Modal>
+            {UpgradePrompt}
         </div>
     );
 };
