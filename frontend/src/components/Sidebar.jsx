@@ -1,6 +1,6 @@
 import {
     LayoutDashboard, Users, FolderOpen, FileText,
-    CreditCard, Wrench, Activity, Trash2, Crown,
+    CreditCard, Wrench, Activity, Trash2, Crown, BookOpen,
     ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -84,7 +84,8 @@ export default function Sidebar() {
                 )}
 
                 <div className="sidebar-divider" />
-                <Item to="/billing" icon={<Crown size={16}/>} label="Plan y facturación" />
+                <Item to="/billing"     icon={<Crown size={16}/>}    label="Plan y facturación" />
+                <Item to="/accounting" icon={<BookOpen size={16}/>} label="Contabilidad" />
             </nav>
 
             {/* USER BLOCK */}
