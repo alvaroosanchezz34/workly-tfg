@@ -1,300 +1,241 @@
 // backend/src/controllers/accounting.controller.js
 import { pool } from '../config/db.js';
 
+const num = v => Number(v || 0);
+
+const getQuarterMonths = q => ({ '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12] }[q] || [1,12]);
+
+const MONTH_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
 // ── GET /api/accounting/summary ───────────────────────────
-// Resumen de ingresos y gastos por período
 export const getSummary = async (req, res) => {
-    const userId = req.user.id;
-    const { year = new Date().getFullYear(), quarter } = req.query;
-
-    let dateFilter = `AND YEAR(i.issue_date) = ?`;
-    const params   = [userId, year];
-
-    if (quarter) {
-        const quarters = { '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12] };
-        const [m1, m2] = quarters[quarter] || [1,12];
-        dateFilter += ` AND MONTH(i.issue_date) BETWEEN ${m1} AND ${m2}`;
-    }
+    const userId  = req.user.id;
+    const year    = parseInt(req.query.year)    || new Date().getFullYear();
+    const quarter = req.query.quarter ? parseInt(req.query.quarter) : null;
 
     try {
-        // Ingresos (facturas pagadas o enviadas)
-        const [incomeRows] = await pool.query(
-            `SELECT
-               DATE_FORMAT(i.issue_date, '%Y-%m') AS month,
-               SUM(i.subtotal_amount)             AS base_imponible,
-               SUM(i.tax_amount)                  AS iva_repercutido,
-               SUM(i.total_amount)                AS total_facturado,
-               SUM(i.paid_amount)                 AS total_cobrado,
-               COUNT(*)                           AS num_facturas
-             FROM invoices i
-             WHERE i.user_id = ? ${dateFilter}
-               AND i.status IN ('sent','paid','overdue')
-               AND i.is_deleted = 0
-             GROUP BY month
-             ORDER BY month ASC`,
-            params
-        );
-
-        // Gastos
+        // Construir filtro de fecha
+        let invWhere = `i.user_id = ? AND YEAR(i.issue_date) = ? AND i.status IN ('sent','paid','overdue') AND i.is_deleted = 0`;
+        let expWhere = `e.user_id = ? AND YEAR(e.date) = ? AND e.is_deleted = 0`;
+        const invParams = [userId, year];
         const expParams = [userId, year];
-        let expFilter   = `AND YEAR(e.date) = ?`;
+
         if (quarter) {
-            const quarters = { '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12] };
-            const [m1, m2] = quarters[quarter] || [1,12];
-            expFilter += ` AND MONTH(e.date) BETWEEN ${m1} AND ${m2}`;
+            const [m1, m2] = getQuarterMonths(String(quarter));
+            invWhere += ` AND MONTH(i.issue_date) BETWEEN ? AND ?`;
+            expWhere += ` AND MONTH(e.date) BETWEEN ? AND ?`;
+            invParams.push(m1, m2);
+            expParams.push(m1, m2);
         }
 
-        const [expenseRows] = await pool.query(
-            `SELECT
-               DATE_FORMAT(e.date, '%Y-%m') AS month,
-               e.category,
-               SUM(e.amount) AS total,
-               COUNT(*)      AS num_gastos
-             FROM expenses e
-             WHERE e.user_id = ? ${expFilter}
-               AND e.is_deleted = 0
-             GROUP BY month, e.category
-             ORDER BY month ASC`,
-            expParams
+        const [incomeRows] = await pool.query(
+            `SELECT DATE_FORMAT(i.issue_date,'%Y-%m') AS month,
+                    COALESCE(SUM(i.subtotal_amount),0) AS base_imponible,
+                    COALESCE(SUM(i.tax_amount),0)      AS iva_repercutido,
+                    COALESCE(SUM(i.total_amount),0)    AS total_facturado,
+                    COALESCE(SUM(i.paid_amount),0)     AS total_cobrado,
+                    COUNT(*) AS num_facturas
+             FROM invoices i WHERE ${invWhere}
+             GROUP BY month ORDER BY month ASC`,
+            invParams
         );
 
-        // Totales globales
         const [[totalsIncome]] = await pool.query(
-            `SELECT
-               SUM(subtotal_amount) AS base_imponible,
-               SUM(tax_amount)      AS iva_repercutido,
-               SUM(total_amount)    AS total_facturado,
-               SUM(paid_amount)     AS total_cobrado
-             FROM invoices
-             WHERE user_id = ? ${dateFilter}
-               AND status IN ('sent','paid','overdue')
-               AND is_deleted = 0`,
-            params
+            `SELECT COALESCE(SUM(subtotal_amount),0) AS base_imponible,
+                    COALESCE(SUM(tax_amount),0)      AS iva_repercutido,
+                    COALESCE(SUM(total_amount),0)    AS total_facturado,
+                    COALESCE(SUM(paid_amount),0)     AS total_cobrado
+             FROM invoices i WHERE ${invWhere}`,
+            invParams
         );
 
         const [[totalsExpense]] = await pool.query(
-            `SELECT SUM(amount) AS total_gastos, COUNT(*) AS num_gastos
-             FROM expenses WHERE user_id = ? ${expFilter} AND is_deleted = 0`,
+            `SELECT COALESCE(SUM(amount),0) AS total_gastos, COUNT(*) AS num_gastos
+             FROM expenses e WHERE ${expWhere}`,
             expParams
         );
 
-        const baseImponible  = Number(totalsIncome?.base_imponible  || 0);
-        const totalGastos    = Number(totalsExpense?.total_gastos    || 0);
-        const ivaRepercutido = Number(totalsIncome?.iva_repercutido  || 0);
+        const baseImponible  = num(totalsIncome?.base_imponible);
+        const totalGastos    = num(totalsExpense?.total_gastos);
+        const ivaRepercutido = num(totalsIncome?.iva_repercutido);
 
         res.json({
-            period:   { year: Number(year), quarter: quarter ? Number(quarter) : null },
+            period:   { year, quarter },
             income:   incomeRows,
-            expenses: expenseRows,
             totals: {
                 base_imponible:   baseImponible,
                 iva_repercutido:  ivaRepercutido,
-                total_facturado:  Number(totalsIncome?.total_facturado || 0),
-                total_cobrado:    Number(totalsIncome?.total_cobrado   || 0),
+                total_facturado:  num(totalsIncome?.total_facturado),
+                total_cobrado:    num(totalsIncome?.total_cobrado),
                 total_gastos:     totalGastos,
                 beneficio_bruto:  baseImponible - totalGastos,
             },
         });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) {
+        console.error('[accounting/summary]', err.message);
+        res.status(500).json({ message: err.message });
+    }
 };
 
 // ── GET /api/accounting/modelo130 ─────────────────────────
-// Datos para el modelo 130 (IRPF trimestral)
 export const getModelo130 = async (req, res) => {
     const userId  = req.user.id;
-    const { year = new Date().getFullYear(), quarter = Math.ceil((new Date().getMonth() + 1) / 3) } = req.query;
-
-    const quarters = { '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12] };
-    const [m1, m2] = quarters[quarter] || [1,3];
+    const year    = parseInt(req.query.year)    || new Date().getFullYear();
+    const quarter = parseInt(req.query.quarter) || Math.ceil((new Date().getMonth() + 1) / 3);
+    const [m1, m2] = getQuarterMonths(String(quarter));
 
     try {
-        // Ingresos del trimestre
         const [[trimIncome]] = await pool.query(
-            `SELECT
-               COALESCE(SUM(subtotal_amount), 0) AS ingresos,
-               COALESCE(SUM(total_amount), 0)    AS ingresos_con_iva
+            `SELECT COALESCE(SUM(subtotal_amount),0) AS ingresos
              FROM invoices
-             WHERE user_id = ? AND status IN ('sent','paid','overdue') AND is_deleted = 0
-               AND YEAR(issue_date) = ? AND MONTH(issue_date) BETWEEN ? AND ?`,
+             WHERE user_id=? AND status IN ('sent','paid','overdue') AND is_deleted=0
+               AND YEAR(issue_date)=? AND MONTH(issue_date) BETWEEN ? AND ?`,
             [userId, year, m1, m2]
         );
-
-        // Gastos del trimestre
         const [[trimExpenses]] = await pool.query(
-            `SELECT COALESCE(SUM(amount), 0) AS gastos
-             FROM expenses
-             WHERE user_id = ? AND is_deleted = 0
-               AND YEAR(date) = ? AND MONTH(date) BETWEEN ? AND ?`,
+            `SELECT COALESCE(SUM(amount),0) AS gastos
+             FROM expenses WHERE user_id=? AND is_deleted=0 AND YEAR(date)=? AND MONTH(date) BETWEEN ? AND ?`,
             [userId, year, m1, m2]
         );
-
-        // Ingresos acumulados del año (trimestres anteriores)
         const [[accumIncome]] = await pool.query(
-            `SELECT COALESCE(SUM(subtotal_amount), 0) AS ingresos_acum
+            `SELECT COALESCE(SUM(subtotal_amount),0) AS ingresos_acum
              FROM invoices
-             WHERE user_id = ? AND status IN ('sent','paid','overdue') AND is_deleted = 0
-               AND YEAR(issue_date) = ? AND MONTH(issue_date) < ?`,
+             WHERE user_id=? AND status IN ('sent','paid','overdue') AND is_deleted=0
+               AND YEAR(issue_date)=? AND MONTH(issue_date) < ?`,
             [userId, year, m1]
         );
-
-        // Gastos acumulados
         const [[accumExpenses]] = await pool.query(
-            `SELECT COALESCE(SUM(amount), 0) AS gastos_acum
-             FROM expenses
-             WHERE user_id = ? AND is_deleted = 0
-               AND YEAR(date) = ? AND MONTH(date) < ?`,
+            `SELECT COALESCE(SUM(amount),0) AS gastos_acum
+             FROM expenses WHERE user_id=? AND is_deleted=0 AND YEAR(date)=? AND MONTH(date) < ?`,
             [userId, year, m1]
         );
 
-        const ingresos      = Number(trimIncome.ingresos);
-        const gastos        = Number(trimExpenses.gastos);
-        const rendimiento   = ingresos - gastos;
-        const ingresosAcum  = Number(accumIncome.ingresos_acum) + ingresos;
-        const gastosAcum    = Number(accumExpenses.gastos_acum) + gastos;
-        const rendimAcum    = ingresosAcum - gastosAcum;
-
-        const TIPO_IRPF     = 0.20; // 20% tipo general
-        const cuotaTrimestre = Math.max(0, rendimiento * TIPO_IRPF);
-        const cuotaAcumulada = Math.max(0, rendimAcum * TIPO_IRPF);
-        const ingresosAcuenta = cuotaAcumulada * 0.25; // Pago fraccionado
+        const ingresos     = num(trimIncome.ingresos);
+        const gastos       = num(trimExpenses.gastos);
+        const rendimiento  = ingresos - gastos;
+        const ingresosAcum = num(accumIncome.ingresos_acum) + ingresos;
+        const gastosAcum   = num(accumExpenses.gastos_acum) + gastos;
+        const rendimAcum   = ingresosAcum - gastosAcum;
+        const TIPO         = 0.20;
+        const cuotaAcum    = Math.max(0, rendimAcum * TIPO);
+        const cuotaTrim    = Math.max(0, rendimiento * TIPO);
 
         res.json({
-            modelo:    '130',
-            year:      Number(year),
-            quarter:   Number(quarter),
-            trimestre: `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m1-1]}-${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m2-1]}`,
+            modelo: '130', year, quarter,
+            trimestre: `${MONTH_SHORT[m1-1]}–${MONTH_SHORT[m2-1]}`,
             casillas: {
-                // Datos del trimestre
-                '01_ingresos':    ingresos,
-                '02_gastos':      gastos,
-                '03_rendimiento': rendimiento,
-                // Datos acumulados
-                '04_ingresos_acum':  ingresosAcum,
-                '05_gastos_acum':    gastosAcum,
-                '06_rendim_acum':    rendimAcum,
-                // Cuota
-                '07_tipo_irpf':   `${TIPO_IRPF * 100}%`,
-                '08_cuota_acum':  cuotaAcumulada,
-                '09_a_ingresar':  Math.max(0, cuotaTrimestre),
+                '01 Ingresos trimestre':     ingresos,
+                '02 Gastos trimestre':       gastos,
+                '03 Rendimiento trimestre':  rendimiento,
+                '04 Ingresos acumulados':    ingresosAcum,
+                '05 Gastos acumulados':      gastosAcum,
+                '06 Rendimiento acumulado':  rendimAcum,
+                '08 Cuota acumulada (20%)':  cuotaAcum,
+                '09 A ingresar (trimestre)': cuotaTrim,
             },
-            aviso: rendimiento < 0 ? 'El rendimiento neto es negativo. No hay cuota a ingresar este trimestre.' : null,
+            aviso: rendimiento < 0 ? 'Rendimiento negativo: no hay cuota a ingresar este trimestre.' : null,
         });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) {
+        console.error('[accounting/modelo130]', err.message);
+        res.status(500).json({ message: err.message });
+    }
 };
 
 // ── GET /api/accounting/modelo303 ─────────────────────────
-// Datos para el modelo 303 (IVA trimestral)
 export const getModelo303 = async (req, res) => {
     const userId  = req.user.id;
-    const { year = new Date().getFullYear(), quarter = Math.ceil((new Date().getMonth() + 1) / 3) } = req.query;
-
-    const quarters = { '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12] };
-    const [m1, m2] = quarters[quarter] || [1,3];
+    const year    = parseInt(req.query.year)    || new Date().getFullYear();
+    const quarter = parseInt(req.query.quarter) || Math.ceil((new Date().getMonth() + 1) / 3);
+    const [m1, m2] = getQuarterMonths(String(quarter));
 
     try {
-        // IVA repercutido (cobrado a clientes) por tipo
-        const [ivaRepercutido] = await pool.query(
-            `SELECT
-               ii.tax_rate,
-               SUM(ii.subtotal)   AS base_imponible,
-               SUM(ii.tax_amount) AS cuota_iva
+        const [ivaRepRows] = await pool.query(
+            `SELECT ii.tax_rate,
+                    COALESCE(SUM(ii.subtotal),0)   AS base_imponible,
+                    COALESCE(SUM(ii.tax_amount),0) AS cuota_iva
              FROM invoice_items ii
              JOIN invoices i ON i.id = ii.invoice_id
-             WHERE i.user_id = ? AND i.is_deleted = 0 AND ii.is_deleted = 0
+             WHERE i.user_id=? AND i.is_deleted=0 AND ii.is_deleted=0
                AND i.status IN ('sent','paid','overdue')
-               AND YEAR(i.issue_date) = ? AND MONTH(i.issue_date) BETWEEN ? AND ?
-             GROUP BY ii.tax_rate
-             ORDER BY ii.tax_rate DESC`,
+               AND YEAR(i.issue_date)=? AND MONTH(i.issue_date) BETWEEN ? AND ?
+             GROUP BY ii.tax_rate ORDER BY ii.tax_rate DESC`,
             [userId, year, m1, m2]
         );
 
-        // IVA soportado (pagado en gastos) — estimado al 21%
-        const [[ivaSoportado]] = await pool.query(
-            `SELECT
-               COALESCE(SUM(amount), 0)                     AS total_gastos,
-               COALESCE(SUM(amount * 0.21 / 1.21), 0)       AS cuota_iva_soportada,
-               COALESCE(SUM(amount / 1.21), 0)              AS base_imponible
-             FROM expenses
-             WHERE user_id = ? AND is_deleted = 0
-               AND YEAR(date) = ? AND MONTH(date) BETWEEN ? AND ?`,
+        const [[gastosSop]] = await pool.query(
+            `SELECT COALESCE(SUM(amount),0) AS total
+             FROM expenses WHERE user_id=? AND is_deleted=0 AND YEAR(date)=? AND MONTH(date) BETWEEN ? AND ?`,
             [userId, year, m1, m2]
         );
 
-        const totalRepercutido = ivaRepercutido.reduce((s, r) => s + Number(r.cuota_iva), 0);
-        const totalSoportado   = Number(ivaSoportado.cuota_iva_soportada);
-        const resultadoNeto    = totalRepercutido - totalSoportado;
+        const totalRep  = ivaRepRows.reduce((s, r) => s + num(r.cuota_iva), 0);
+        const totalGast = num(gastosSop.total);
+        const ivaEst    = totalGast * 0.21 / 1.21; // IVA estimado en gastos al 21%
+        const resultado = totalRep - ivaEst;
 
         res.json({
-            modelo:    '303',
-            year:      Number(year),
-            quarter:   Number(quarter),
-            trimestre: `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m1-1]}-${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m2-1]}`,
-            iva_repercutido: ivaRepercutido.map(r => ({
-                tipo:            `${r.tax_rate}%`,
-                base_imponible:  Number(r.base_imponible),
-                cuota:           Number(r.cuota_iva),
+            modelo: '303', year, quarter,
+            trimestre: `${MONTH_SHORT[m1-1]}–${MONTH_SHORT[m2-1]}`,
+            iva_repercutido: ivaRepRows.map(r => ({
+                tipo:           `${r.tax_rate}%`,
+                base_imponible: num(r.base_imponible),
+                cuota:          num(r.cuota_iva),
             })),
             iva_soportado: {
-                base_imponible: Number(ivaSoportado.base_imponible),
-                cuota:          totalSoportado,
-                nota:           'Estimado al 21% sobre gastos deducibles',
+                base_imponible: Math.round(totalGast / 1.21 * 100) / 100,
+                cuota:          Math.round(ivaEst * 100) / 100,
+                nota:           'Estimado al 21% sobre total gastos',
             },
             casillas: {
-                '27_total_repercutido': totalRepercutido,
-                '45_total_deducible':   totalSoportado,
-                '46_resultado':         resultadoNeto,
-                '69_a_ingresar':        Math.max(0, resultadoNeto),
-                '71_a_devolver':        Math.max(0, -resultadoNeto),
+                '27 IVA repercutido total': totalRep,
+                '45 IVA deducible total':   Math.round(ivaEst * 100) / 100,
+                '46 Resultado':             Math.round(resultado * 100) / 100,
+                '69 A ingresar':            Math.max(0, Math.round(resultado * 100) / 100),
+                '71 A devolver':            Math.max(0, Math.round(-resultado * 100) / 100),
             },
-            aviso: resultadoNeto < 0 ? 'Resultado negativo: tienes derecho a compensar o solicitar devolución.' : null,
+            aviso: resultado < 0 ? 'Resultado negativo: tienes derecho a compensar o solicitar devolución a Hacienda.' : null,
         });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) {
+        console.error('[accounting/modelo303]', err.message);
+        res.status(500).json({ message: err.message });
+    }
 };
 
 // ── GET /api/accounting/libro ─────────────────────────────
-// Libro de ingresos y gastos completo
 export const getLibro = async (req, res) => {
     const userId = req.user.id;
-    const { year = new Date().getFullYear() } = req.query;
+    const year   = parseInt(req.query.year) || new Date().getFullYear();
 
     try {
         const [ingresos] = await pool.query(
-            `SELECT
-               i.invoice_number   AS numero,
-               i.issue_date       AS fecha,
-               c.name             AS cliente,
-               i.subtotal_amount  AS base_imponible,
-               i.tax_amount       AS iva,
-               i.total_amount     AS total,
-               i.status
-             FROM invoices i
-             JOIN clients c ON c.id = i.client_id
-             WHERE i.user_id = ? AND YEAR(i.issue_date) = ?
-               AND i.status IN ('sent','paid','overdue')
-               AND i.is_deleted = 0
+            `SELECT i.invoice_number AS numero,
+                    i.issue_date     AS fecha,
+                    c.name           AS cliente,
+                    COALESCE(i.subtotal_amount,0) AS base_imponible,
+                    COALESCE(i.tax_amount,0)      AS iva,
+                    COALESCE(i.total_amount,0)    AS total,
+                    i.status
+             FROM invoices i JOIN clients c ON c.id = i.client_id
+             WHERE i.user_id=? AND YEAR(i.issue_date)=?
+               AND i.status IN ('sent','paid','overdue') AND i.is_deleted=0
              ORDER BY i.issue_date ASC`,
             [userId, year]
         );
 
         const [gastos] = await pool.query(
-            `SELECT
-               e.date        AS fecha,
-               e.category    AS categoria,
-               e.description AS concepto,
-               e.amount      AS importe,
-               e.receipt_url AS justificante
-             FROM expenses e
-             WHERE e.user_id = ? AND YEAR(e.date) = ?
-               AND e.is_deleted = 0
-             ORDER BY e.date ASC`,
+            `SELECT date AS fecha, category AS categoria,
+                    description AS concepto, amount AS importe
+             FROM expenses
+             WHERE user_id=? AND YEAR(date)=? AND is_deleted=0
+             ORDER BY date ASC`,
             [userId, year]
         );
 
-        const totalIngresos = ingresos.reduce((s, r) => s + Number(r.base_imponible), 0);
-        const totalGastos   = gastos.reduce((s, r)   => s + Number(r.importe), 0);
+        const totalIngresos = ingresos.reduce((s, r) => s + num(r.base_imponible), 0);
+        const totalGastos   = gastos.reduce((s, r)   => s + num(r.importe), 0);
 
         res.json({
-            year:     Number(year),
+            year,
             ingresos,
             gastos,
             resumen: {
@@ -305,5 +246,8 @@ export const getLibro = async (req, res) => {
                 num_gastos:      gastos.length,
             },
         });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+    } catch (err) {
+        console.error('[accounting/libro]', err.message);
+        res.status(500).json({ message: err.message });
+    }
 };

@@ -25,7 +25,9 @@ const MetricCard = ({ label, value, color = 'var(--primary)', sub }) => (
     </div>
 );
 
-const CasillasTable = ({ casillas, title }) => (
+const CasillasTable = ({ casillas, title }) => {
+    if (!casillas || typeof casillas !== 'object') return null;
+    return (
     <div className="table-wrap" style={{ marginTop: 20 }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>{title}</div>
         <table className="data-table">
@@ -46,7 +48,8 @@ const CasillasTable = ({ casillas, title }) => (
             </tbody>
         </table>
     </div>
-);
+    );
+};
 
 export default function Accounting() {
     const { token } = useContext(AuthContext);
