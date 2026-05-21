@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Select, Textarea } from './FormComponents';
 import InvoiceItems from './InvoiceItems';
+import AIInvoiceGenerator from './ai/AIInvoiceGenerator';
 
 const STATUS_OPTIONS = [
     { value: 'draft',   label: 'Borrador' },
@@ -81,9 +82,10 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
                 <Select label="Estado" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
             </div>
 
-            {/* Líneas */}
+            {/* Líneas con generador IA */}
             <div>
                 <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>Líneas de factura</label>
+                <AIInvoiceGenerator onApply={lines => setItems(lines)} />
                 <InvoiceItems items={items} setItems={setItems} services={services} />
             </div>
 

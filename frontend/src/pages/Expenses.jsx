@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import ExpenseForm from '../components/ExpenseForm';
 import Pagination from '../components/Pagination';
+import OCRExpenseUploader from '../components/ai/OCRExpenseUploader';
 import { Plus, TrendingDown, Search } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -63,7 +64,12 @@ export default function Expenses() {
     const handleDelete  = async () => { await deleteExpense(token, toDelete.id); setToDelete(null); load(page, catFilter); };
     const closeModal    = () => { setShowForm(false); setEditing(null); };
 
-    // Búsqueda local sobre la página actual (el filtrado por categoría es server-side)
+    // OCR: cuando la IA detecta un ticket, pre-rellena el formulario
+    const handleOCRApply = data => {
+        setEditing(data);   // pre-rellena con los datos del ticket
+        setShowForm(true);
+    };
+
     const filtered = search
         ? expenses.filter(e => {
             const q = search.toLowerCase();
@@ -74,7 +80,6 @@ export default function Expenses() {
     const total         = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
     const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);
 
-    // Categorías que tienen al menos 1 gasto
     const usedCats = [...new Set(expenses.map(e => e.category).filter(Boolean))];
 
     return (
@@ -96,9 +101,12 @@ export default function Expenses() {
                             )}
                         </p>
                     </div>
-                    <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-                        <Plus size={15} /> Nuevo gasto
-                    </button>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <OCRExpenseUploader onApply={handleOCRApply} />
+                        <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
+                            <Plus size={15} /> Nuevo gasto
+                        </button>
+                    </div>
                 </div>
 
                 {error && (
@@ -220,8 +228,8 @@ export default function Expenses() {
             </main>
 
             {/* ── MODAL FORM ── */}
-            <Modal open={showForm || !!editing} size="lg" title={editing ? 'Editar gasto' : 'Nuevo gasto'} onClose={closeModal}>
-                <ExpenseForm initialData={editing} onSubmit={editing ? handleEdit : handleCreate} onCancel={closeModal} />
+            <Modal open={showForm || !!editing} size="lg" title={editing?.id ? 'Editar gasto' : 'Nuevo gasto'} onClose={closeModal}>
+                <ExpenseForm initialData={editing} onSubmit={editing?.id ? handleEdit : handleCreate} onCancel={closeModal} />
             </Modal>
 
             {/* ── CONFIRMAR BORRADO ── */}

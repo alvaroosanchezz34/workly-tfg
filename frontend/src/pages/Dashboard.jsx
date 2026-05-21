@@ -6,6 +6,8 @@ import MetricCard from '../components/MetricCard';
 import ChartCard from '../components/ChartCard';
 import AlertBox from '../components/AlertBox';
 import QuickActions from '../components/QuickActions';
+import AISummaryWidget from '../components/ai/AISummaryWidget';
+import AIChat from '../components/ai/AIChat';
 import { TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle } from 'lucide-react';
 
 const fmt = v => new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR' }).format(v ?? 0);
@@ -65,6 +67,9 @@ const Dashboard = () => {
                     <AlertBox type="danger" title="Error" description={error} />
                 )}
 
+                {/* WIDGET IA */}
+                <AISummaryWidget />
+
                 {loading ? <SkeletonRow /> : (
                     <>
                         {/* ALERTAS */}
@@ -81,7 +86,7 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {/* MÉTRICAS — grid de 5 columnas para que queden iguales */}
+                        {/* MÉTRICAS */}
                         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}>
                             <MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} />
                             <MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} />
@@ -142,6 +147,9 @@ const Dashboard = () => {
                     </>
                 )}
             </main>
+
+            {/* ASISTENTE IA FLOTANTE */}
+            <AIChat />
         </div>
     );
 };

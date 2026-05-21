@@ -4,6 +4,7 @@ import Modal from '../Modal';
 import InvoiceItems from '../InvoiceItems';
 import { Select, Textarea } from '../FormComponents';
 import { getQuotes, createQuote, updateQuote, deleteQuote, convertQuote } from '../../api/quotes';
+import AISmartQuote from '../ai/AISmartQuote';
 import { Plus, FileText, ArrowRight, CheckCircle } from 'lucide-react';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
@@ -48,6 +49,10 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
 
     return (
         <form id="quote-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Botón IA */}
+            <AISmartQuote clients={clients} onApply={lines => setItems(lines)} />
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                     <label className="form-label">Cliente *</label>
