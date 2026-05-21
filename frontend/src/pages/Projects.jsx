@@ -1,4 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ProjectForm from '../components/ProjectForm';
@@ -6,7 +7,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects';
 import { getClients } from '../api/clients';
-import { Plus, FolderOpen, CalendarDays, Search, LayoutGrid, List } from 'lucide-react';
+import { Plus, FolderOpen, CalendarDays, Search, LayoutGrid, List, ClipboardList } from 'lucide-react';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -34,6 +35,7 @@ function KanbanCard({ project, onEdit, onDelete, isDragging, onDragStart, onDrag
                 {project.budget   && <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--secondary)' }}>{fmt(project.budget)}</span>}
             </div>
             <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button className="action-link" style={{ fontSize: 11.5, color: 'var(--primary)' }} onClick={() => window.location.href=`/projects/${project.id}/tasks`}>Tareas</button>
                 <button className="action-link action-link-primary" style={{ fontSize: 11.5 }} onClick={() => onEdit(project)}>Editar</button>
                 <button className="action-link action-link-danger"  style={{ fontSize: 11.5 }} onClick={() => onDelete(project)}>Eliminar</button>
             </div>
@@ -43,6 +45,7 @@ function KanbanCard({ project, onEdit, onDelete, isDragging, onDragStart, onDrag
 
 export default function Projects() {
     const { token } = useContext(AuthContext);
+    const navigate  = useNavigate();
     const [projects,     setProjects]     = useState([]);
     const [clients,      setClients]      = useState([]);
     const [loading,      setLoading]      = useState(true);
@@ -154,6 +157,9 @@ export default function Projects() {
                                                 <td><div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--text-secondary)' }}><CalendarDays size={12} color="var(--text-disabled)"/>{fmtDate(p.start_date)} → {fmtDate(p.end_date)}</div></td>
                                                 <td style={{ fontWeight: 600 }}>{p.budget ? fmt(p.budget) : <span style={{ color: 'var(--text-disabled)' }}>—</span>}</td>
                                                 <td style={{ textAlign: 'right' }}>
+                                                    <button className="action-link" style={{ color: 'var(--primary)', marginRight: 4 }} onClick={() => navigate(`/projects/${p.id}/tasks`)}>
+                                                        <ClipboardList size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} />Tareas
+                                                    </button>
                                                     <button className="action-link action-link-primary" onClick={() => openEdit(p)}>Editar</button>
                                                     <button className="action-link action-link-danger" style={{ marginLeft: 4 }} onClick={() => setToDelete(p)}>Eliminar</button>
                                                 </td>

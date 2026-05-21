@@ -15,6 +15,7 @@ import DeletedClients from './pages/DeletedClients';
 import Services       from './pages/Services';
 import Expenses       from './pages/Expenses';
 import Projects       from './pages/Projects';
+import ProjectTasks   from './pages/ProjectTasks';
 import Invoices       from './pages/Invoices';
 import PublicInvoice  from './pages/PublicInvoice';
 import Team           from './pages/Team';
@@ -102,6 +103,7 @@ const AppInner = () => (
             <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
             <Route path="/clients/:id"     element={<PrivateRoute><ClientProfile /></PrivateRoute>} />
             <Route path="/projects"        element={<PrivateRoute><Projects /></PrivateRoute>} />
+            <Route path="/projects/:projectId/tasks" element={<PrivateRoute><ProjectTasks /></PrivateRoute>} />
             <Route path="/invoices"        element={<PrivateRoute><Invoices /></PrivateRoute>} />
             <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
             <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
