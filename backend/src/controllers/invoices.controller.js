@@ -91,7 +91,7 @@ export const updateInvoice = async (req, res) => {
 };
 
 export const getInvoices = async (req, res) => {
-    const { status, client_id, date_from, date_to, min_amount, max_amount } = req.query;
+    const { status, client_id, date_from, date_to, min_amount, max_amount, search } = req.query;
     const { page, pageSize, limit, offset } = getPagination(req.query);
     try {
         // El marcado de facturas vencidas lo gestiona el scheduler diario (09:00)
@@ -104,6 +104,7 @@ export const getInvoices = async (req, res) => {
         if (date_to) { where += ` AND i.issue_date<=?`; params.push(date_to); }
         if (min_amount) { where += ` AND i.total_amount>=?`; params.push(min_amount); }
         if (max_amount) { where += ` AND i.total_amount<=?`; params.push(max_amount); }
+        if (search)     { where += ` AND (i.invoice_number LIKE ? OR c.name LIKE ?)`; const like = `%${search}%`; params.push(like, like); }
 
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) AS total FROM invoices i JOIN clients c ON c.id=i.client_id WHERE ${where}`,

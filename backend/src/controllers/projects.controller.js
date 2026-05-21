@@ -62,18 +62,23 @@ export const createProject = async (req, res) => {
 
 // Obtener proyectos del usuario (NO eliminados)
 export const getProjects = async (req, res) => {
+    const { search } = req.query;
     try {
+        let where = `p.user_id = ? AND p.is_deleted = 0 AND c.is_deleted = 0`;
+        const params = [req.user.id];
+        if (search) {
+            where += ` AND (p.title LIKE ? OR c.name LIKE ?)`;
+            const like = `%${search}%`;
+            params.push(like, like);
+        }
         const [rows] = await pool.query(
             `SELECT p.*, c.name AS client_name
-       FROM projects p
-       JOIN clients c ON p.client_id = c.id
-       WHERE p.user_id = ?
-       AND p.is_deleted = 0
-       AND c.is_deleted = 0
-       ORDER BY p.created_at DESC`,
-            [req.user.id]
+             FROM projects p
+             JOIN clients c ON p.client_id = c.id
+             WHERE ${where}
+             ORDER BY p.created_at DESC`,
+            params
         );
-
         res.json(rows);
     } catch (error) {
         res.status(500).json({ message: error.message });

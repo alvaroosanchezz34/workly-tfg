@@ -19,6 +19,7 @@ import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
 import { getServices } from '../api/services';
 import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown, Send, Mail } from 'lucide-react';
+import Pagination from '../components/Pagination';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -170,6 +171,8 @@ export default function Invoices() {
     const { token } = useContext(AuthContext);
 
     const [invoices,  setInvoices]  = useState([]);
+    const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: 20, totalPages: 1 });
+    const [page,       setPage]       = useState(1);
     const [clients,   setClients]   = useState([]);
     const [projects,  setProjects]  = useState([]);
     const [services,  setServices]  = useState([]);
@@ -207,7 +210,9 @@ export default function Invoices() {
                 getServices(token),
             ]);
             // getInvoices y getClients devuelven {data, pagination} — extraer el array
-            setInvoices(Array.isArray(inv) ? inv : (inv?.data ?? []));
+            const invArr = Array.isArray(inv) ? inv : (inv?.data ?? []);
+            setInvoices(invArr);
+            if (inv?.pagination) setPagination(inv.pagination);
             setClients(Array.isArray(cli)  ? cli : (cli?.data ?? []));
             setProjects(proj); setServices(svc);
         } catch { setError('No se pudieron cargar las facturas.'); }
@@ -421,6 +426,13 @@ export default function Invoices() {
                                         })}
                                     </tbody>
                                 </table>
+                                <Pagination
+                                    page={pagination.page}
+                                    totalPages={pagination.totalPages}
+                                    total={pagination.total}
+                                    pageSize={pagination.pageSize}
+                                    onPage={p => { setPage(p); }}
+                                />
                             </div>
                         )}
                     </>
