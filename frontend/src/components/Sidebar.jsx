@@ -1,7 +1,7 @@
 import {
     LayoutDashboard, Users, FolderOpen, FileText,
     CreditCard, Wrench, Activity, Trash2, Crown, BookOpen,
-    ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun,
+    ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun, Timer,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useContext, useState, useRef, useEffect } from 'react';
@@ -73,6 +73,7 @@ export default function Sidebar() {
                 <span className="sidebar-section-label" style={{ marginTop: 8 }}>Finanzas</span>
                 <Item to="/expenses"  icon={<CreditCard size={16}/>}      label="Gastos" />
                 <Item to="/services"  icon={<Wrench size={16}/>}          label="Servicios" />
+                <Item to="/time"      icon={<Timer size={16}/>}           label="Control de horas" />
 
                 {user?.role === 'admin' && (
                     <>
