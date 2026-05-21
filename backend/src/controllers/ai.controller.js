@@ -62,21 +62,27 @@ export const getBusinessSummary = async (req, res) => {
             [userId, year]
         );
 
-        const incomeDiff = lastMonth.income > 0
-            ? (((thisMonth.income - lastMonth.income) / lastMonth.income) * 100).toFixed(1)
+        // MySQL puede devolver strings — convertir a Number
+        const tmIncome  = Number(thisMonth.income   || 0);
+        const lmIncome  = Number(lastMonth.income   || 0);
+        const tmExpense = Number(thisExpenses.total  || 0);
+        const lmExpense = Number(lastExpenses.total  || 0);
+
+        const incomeDiff = lmIncome > 0
+            ? (((tmIncome - lmIncome) / lmIncome) * 100).toFixed(1)
             : null;
-        const expenseDiff = lastExpenses.total > 0
-            ? (((thisExpenses.total - lastExpenses.total) / lastExpenses.total) * 100).toFixed(1)
+        const expenseDiff = lmExpense > 0
+            ? (((tmExpense - lmExpense) / lmExpense) * 100).toFixed(1)
             : null;
 
         const prompt = `Eres un asistente financiero para freelancers españoles. Analiza estos datos del negocio y genera un resumen ejecutivo en español, conciso (máximo 4 frases), en tono profesional pero cercano. Usa emojis con moderación. NO uses markdown, solo texto plano.
 
 Datos:
-- Ingresos este mes: ${thisMonth.income.toFixed(2)}€
-- Ingresos mes anterior: ${lastMonth.income.toFixed(2)}€
+- Ingresos este mes: ${tmIncome.toFixed(2)}€
+- Ingresos mes anterior: ${lmIncome.toFixed(2)}€
 - Variación ingresos: ${incomeDiff !== null ? incomeDiff + '%' : 'sin datos previos'}
-- Gastos este mes: ${thisExpenses.total.toFixed(2)}€
-- Gastos mes anterior: ${lastExpenses.total.toFixed(2)}€
+- Gastos este mes: ${tmExpense.toFixed(2)}€
+- Gastos mes anterior: ${lmExpense.toFixed(2)}€
 - Variación gastos: ${expenseDiff !== null ? expenseDiff + '%' : 'sin datos previos'}
 - Facturas vencidas sin cobrar: ${overdueCount.total}
 - Top clientes: ${topClients.map(c => `${c.name} (${Number(c.total).toFixed(2)}€)`).join(', ') || 'sin datos'}
