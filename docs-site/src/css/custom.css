@@ -1,0 +1,45 @@
+:root {
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f52e8;
+  --ifm-color-primary-darker: #4245e3;
+  --ifm-color-primary-darkest: #2c2fce;
+  --ifm-color-primary-light: #777af4;
+  --ifm-color-primary-lighter: #8487f5;
+  --ifm-color-primary-lightest: #a8aaf8;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(99, 102, 241, 0.1);
+  --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6a75f6;
+  --ifm-color-primary-darker: #5e69f5;
+  --ifm-color-primary-darkest: #3b45f2;
+  --ifm-color-primary-light: #98a2fa;
+  --ifm-color-primary-lighter: #a4aefb;
+  --ifm-color-primary-lightest: #c7ccfd;
+  --docusaurus-highlighted-code-line-bg: rgba(129, 140, 248, 0.15);
+  --ifm-background-color: #0f0f1a;
+  --ifm-navbar-background-color: #0f0f1a;
+  --ifm-footer-background-color: #0a0a14;
+}
+
+.navbar__brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+article table {
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+article table th {
+  background: var(--ifm-color-primary);
+  color: white;
+}
+
+[data-theme='dark'] article table th {
+  background: #3730a3;
+}
