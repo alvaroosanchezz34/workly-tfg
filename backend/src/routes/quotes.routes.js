@@ -4,14 +4,17 @@ import {
     createQuote, getQuotes, getQuoteById,
     updateQuote, deleteQuote, convertQuoteToInvoice,
 } from '../controllers/quotes.controller.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
+import { authenticate }     from '../middlewares/auth.middleware.js';
+import { requireFeature }   from '../middlewares/plan.middleware.js';
 
 const router = Router();
-router.get('/',              authenticate, getQuotes);
-router.post('/',             authenticate, createQuote);
-router.get('/:id',           authenticate, getQuoteById);
-router.put('/:id',           authenticate, updateQuote);
-router.delete('/:id',        authenticate, deleteQuote);
-router.post('/:id/convert',  authenticate, convertQuoteToInvoice);
+
+// Todas las rutas de presupuestos requieren plan Pro o superior (quotes: false en Free)
+router.get('/',              authenticate, requireFeature('quotes'), getQuotes);
+router.post('/',             authenticate, requireFeature('quotes'), createQuote);
+router.get('/:id',           authenticate, requireFeature('quotes'), getQuoteById);
+router.put('/:id',           authenticate, requireFeature('quotes'), updateQuote);
+router.delete('/:id',        authenticate, requireFeature('quotes'), deleteQuote);
+router.post('/:id/convert',  authenticate, requireFeature('quotes'), convertQuoteToInvoice);
 
 export default router;

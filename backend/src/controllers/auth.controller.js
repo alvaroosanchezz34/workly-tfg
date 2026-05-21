@@ -33,7 +33,7 @@ export const register = async (req, res) => {
         }
 
         // Hash contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 12);
 
         // FIX: el role NUNCA viene del cliente, siempre se fuerza a 'user'
         const [result] = await pool.query(

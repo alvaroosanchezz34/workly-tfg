@@ -1,8 +1,11 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getActivityLogs } from '../api/activityLogs';
 import { FilePlus, FileEdit, Trash2, RotateCcw, Activity } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 50;
 
 const ACTION_META = {
     created:  { icon: <FilePlus  size={13} />, cls: 'badge badge-paid',    label: 'Creado'     },
@@ -13,7 +16,8 @@ const ACTION_META = {
 
 const ENTITY_LABEL = {
     client: 'Cliente', project: 'Proyecto', invoice: 'Factura',
-    expense: 'Gasto',  service: 'Servicio',
+    expense: 'Gasto',  service: 'Servicio', quote: 'Presupuesto',
+    credit_note: 'Nota de crédito',
 };
 
 const timeAgo = d => {
@@ -26,19 +30,31 @@ const timeAgo = d => {
 
 export default function ActivityLogs() {
     const { token } = useContext(AuthContext);
-    const [logs,    setLogs]    = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState('');
+    const [logs,       setLogs]       = useState([]);
+    const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 });
+    const [loading,    setLoading]    = useState(true);
+    const [error,      setError]      = useState('');
+    const [page,       setPage]       = useState(1);
+    const [entityFilter, setEntityFilter] = useState('');
 
-    useEffect(() => {
+    const load = useCallback(async (p = 1, entity = entityFilter) => {
         if (!token) return;
         setLoading(true);
         setError('');
-        getActivityLogs(token)
-            .then(setLogs)
-            .catch(() => setError('No se pudo cargar el registro de actividad.'))
-            .finally(() => setLoading(false));
-    }, [token]);
+        try {
+            const params = new URLSearchParams({ page: p, limit: PAGE_SIZE });
+            if (entity) params.set('entity', entity);
+            const res = await getActivityLogs(token, params.toString());
+            setLogs(res.data ?? []);
+            setPagination(res.pagination ?? { total: 0, page: p, pageSize: PAGE_SIZE, totalPages: 1 });
+        } catch { setError('No se pudo cargar el registro de actividad.'); }
+        finally { setLoading(false); }
+    }, [token, entityFilter]);
+
+    useEffect(() => { load(1, ''); }, [token]);
+
+    const handlePage   = p => { setPage(p); load(p, entityFilter); };
+    const handleEntity = e => { setEntityFilter(e); setPage(1); load(1, e); };
 
     return (
         <div className="app-layout">
@@ -48,13 +64,23 @@ export default function ActivityLogs() {
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Registro de actividad</h1>
-                        <p className="page-subtitle">Historial de acciones realizadas en el sistema</p>
+                        <p className="page-subtitle">{pagination.total} acción{pagination.total !== 1 ? 'es' : ''} registrada{pagination.total !== 1 ? 's' : ''}</p>
                     </div>
+                    {/* Filtro por entidad */}
+                    <select
+                        className="form-input"
+                        style={{ width: 'auto', minWidth: 160 }}
+                        value={entityFilter}
+                        onChange={e => handleEntity(e.target.value)}
+                    >
+                        <option value="">Todas las entidades</option>
+                        {Object.entries(ENTITY_LABEL).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                        ))}
+                    </select>
                 </div>
 
-                {error && (
-                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>
-                )}
+                {error && <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>}
 
                 {loading ? (
                     <div className="table-wrap">
@@ -91,25 +117,18 @@ export default function ActivityLogs() {
                             <tbody>
                                 {logs.map((log, i) => {
                                     const meta = ACTION_META[log.action] || {
-                                        icon: <Activity size={13} />,
-                                        cls:  'badge badge-draft',
-                                        label: log.action,
+                                        icon: <Activity size={13} />, cls: 'badge badge-draft', label: log.action,
                                     };
                                     return (
                                         <tr key={log.id} style={{ animationDelay: `${i * 18}ms` }}>
                                             <td>
                                                 <span className={meta.cls} style={{ gap: 6 }}>
-                                                    {meta.icon}
-                                                    {meta.label}
+                                                    {meta.icon}{meta.label}
                                                 </span>
                                             </td>
                                             <td>
-                                                <span style={{ fontWeight: 500 }}>
-                                                    {ENTITY_LABEL[log.entity] || log.entity}
-                                                </span>
-                                                <span style={{ color: 'var(--text-disabled)', fontSize: 12, marginLeft: 5 }}>
-                                                    #{log.entity_id}
-                                                </span>
+                                                <span style={{ fontWeight: 500 }}>{ENTITY_LABEL[log.entity] || log.entity}</span>
+                                                <span style={{ color: 'var(--text-disabled)', fontSize: 12, marginLeft: 5 }}>#{log.entity_id}</span>
                                             </td>
                                             <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                                                 {log.user_name || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
@@ -122,6 +141,13 @@ export default function ActivityLogs() {
                                 })}
                             </tbody>
                         </table>
+                        <Pagination
+                            page={pagination.page}
+                            totalPages={pagination.totalPages}
+                            total={pagination.total}
+                            pageSize={pagination.pageSize}
+                            onPage={handlePage}
+                        />
                     </div>
                 )}
             </main>

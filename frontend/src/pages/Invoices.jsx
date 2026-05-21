@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { fetchWithAuth } from '../context/fetchWithAuth';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import InvoiceForm from '../components/InvoiceForm';
@@ -14,6 +13,7 @@ import InvoiceSettingsModal from '../components/invoice/InvoiceSettingsModal';
 import {
     getInvoices, getInvoiceById, createInvoice, updateInvoice,
     deleteInvoice, downloadInvoicePDF, updateInvoiceStatus, getInvoiceStats,
+    sendInvoiceByEmail,
 } from '../api/invoices';
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
@@ -206,7 +206,10 @@ export default function Invoices() {
                 getProjects(token),
                 getServices(token),
             ]);
-            setInvoices(inv); setClients(cli); setProjects(proj); setServices(svc);
+            // getInvoices y getClients devuelven {data, pagination} — extraer el array
+            setInvoices(Array.isArray(inv) ? inv : (inv?.data ?? []));
+            setClients(Array.isArray(cli)  ? cli : (cli?.data ?? []));
+            setProjects(proj); setServices(svc);
         } catch { setError('No se pudieron cargar las facturas.'); }
         finally { setLoading(false); }
     }, [token, filters]);
@@ -257,13 +260,8 @@ export default function Invoices() {
         if (!sendEmail.trim()) return alert('Introduce un email destinatario');
         setSending(true);
         try {
-            const res  = await fetchWithAuth(
-                `${import.meta.env.VITE_API_URL}/invoices/${showSend.id}/send`,
-                token,
-                { method: 'POST', body: JSON.stringify({ to: sendEmail.trim() }) }
-            );
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
+            const data = await sendInvoiceByEmail(token, showSend.id, sendEmail.trim());
+            if (data.message?.toLowerCase().includes('error')) throw new Error(data.message);
             setSendOk(data.message);
             load();
         } catch (err) { alert(`Error: ${err.message}`); }

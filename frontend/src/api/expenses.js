@@ -2,8 +2,9 @@ import { fetchWithAuth } from '../context/fetchWithAuth';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/expenses`;
 
-export const getExpenses = async (token) => {
-    const res = await fetchWithAuth(API_URL, token);
+export const getExpenses = async (token, queryString = '') => {
+    const url = queryString ? `${API_URL}?${queryString}` : API_URL;
+    const res = await fetchWithAuth(url, token);
     if (!res.ok) throw new Error('Error al cargar gastos');
     return res.json();
 };

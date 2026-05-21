@@ -18,7 +18,7 @@ export const getMe = async (req, res) => {
 
 // Endpoint usado por Profile.jsx como PUT /users/profile
 export const updateProfile = async (req, res) => {
-    const { name, email, password, phone, company_name, avatar_url, language, timezone } = req.body;
+    const { name, email, current_password, password, phone, company_name, avatar_url, language, timezone } = req.body;
 
     if (!name || !email) return res.status(400).json({ message: 'Nombre y email son obligatorios' });
 
@@ -42,8 +42,19 @@ export const updateProfile = async (req, res) => {
         ];
 
         if (password) {
-            if (password.length < 6) return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
-            params.push(await bcrypt.hash(password, 10));
+            if (password.length < 6)
+                return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+
+            // FIX: verificar contraseña actual antes de permitir el cambio
+            if (!current_password)
+                return res.status(400).json({ message: 'Debes introducir tu contraseña actual para cambiarla' });
+
+            const [[userRow]] = await pool.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+            const valid = await bcrypt.compare(current_password, userRow.password);
+            if (!valid)
+                return res.status(401).json({ message: 'La contraseña actual es incorrecta' });
+
+            params.push(await bcrypt.hash(password, 12));
             query += ', password=?';
         }
 
@@ -52,7 +63,6 @@ export const updateProfile = async (req, res) => {
 
         await pool.query(query, params);
 
-        // Devolver usuario actualizado para que el frontend actualice el contexto
         const [updated] = await pool.query(
             `SELECT id, name, email, role, company_name, avatar_url, phone, language, timezone, plan
              FROM users WHERE id = ?`,

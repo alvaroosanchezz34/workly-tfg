@@ -35,15 +35,18 @@ export default function GlobalSearch({ token, onClose }) {
             setLoading(true);
             try {
                 const q = encodeURIComponent(query.trim());
-                const [cli, proj, inv] = await Promise.all([
-                    fetchWithAuth(`${API}/clients?search=${q}`, token).then(r => r.json()).catch(() => []),
+                const [cliRes, proj, invRes] = await Promise.all([
+                    fetchWithAuth(`${API}/clients?search=${q}&limit=5`, token).then(r => r.json()).catch(() => []),
                     fetchWithAuth(`${API}/projects?search=${q}`, token).then(r => r.json()).catch(() => []),
-                    fetchWithAuth(`${API}/invoices?search=${q}`, token).then(r => r.json()).catch(() => []),
+                    fetchWithAuth(`${API}/invoices?search=${q}&limit=4`, token).then(r => r.json()).catch(() => []),
                 ]);
+                // clients y invoices devuelven {data, pagination} — extraer el array
+                const cli = Array.isArray(cliRes) ? cliRes : (cliRes?.data ?? []);
+                const inv = Array.isArray(invRes) ? invRes : (invRes?.data ?? []);
                 const all = [
-                    ...(Array.isArray(cli)  ? cli.slice(0,4).map(c => ({ type: 'client',  id: c.id, label: c.name,           sub: c.company || c.email })) : []),
+                    ...cli.slice(0,4).map(c => ({ type: 'client',  id: c.id, label: c.name,           sub: c.company || c.email })),
                     ...(Array.isArray(proj) ? proj.slice(0,4).map(p => ({ type: 'project', id: p.id, label: p.title,          sub: p.client_name })) : []),
-                    ...(Array.isArray(inv)  ? inv.slice(0,3).map(i => ({ type: 'invoice', id: i.id, label: i.invoice_number, sub: i.client_name })) : []),
+                    ...inv.slice(0,3).map(i => ({ type: 'invoice', id: i.id, label: i.invoice_number, sub: i.client_name })),
                 ];
                 setResults(all);
                 setActive(0);

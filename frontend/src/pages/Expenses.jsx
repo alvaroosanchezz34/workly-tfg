@@ -1,11 +1,13 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getExpenses, createExpense, updateExpense, deleteExpense } from '../api/expenses';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import ExpenseForm from '../components/ExpenseForm';
+import Pagination from '../components/Pagination';
 import { Plus, TrendingDown, Search } from 'lucide-react';
 
+const PAGE_SIZE = 20;
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -29,38 +31,46 @@ const CAT_LABELS = {
 export default function Expenses() {
     const { token } = useContext(AuthContext);
     const [expenses,   setExpenses]   = useState([]);
+    const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 });
     const [loading,    setLoading]    = useState(true);
     const [error,      setError]      = useState('');
     const [search,     setSearch]     = useState('');
     const [catFilter,  setCatFilter]  = useState('all');
+    const [page,       setPage]       = useState(1);
     const [showForm,   setShowForm]   = useState(false);
     const [editing,    setEditing]    = useState(null);
     const [toDelete,   setToDelete]   = useState(null);
 
-    const load = async () => {
+    const load = useCallback(async (p = 1, cat = catFilter) => {
         setLoading(true);
         setError('');
-        try { setExpenses(await getExpenses(token)); }
-        catch { setError('No se pudieron cargar los gastos.'); }
+        try {
+            const params = new URLSearchParams({ page: p, limit: PAGE_SIZE });
+            if (cat !== 'all') params.set('category', cat);
+            const res = await getExpenses(token, params.toString());
+            setExpenses(res.data ?? []);
+            setPagination(res.pagination ?? { total: 0, page: p, pageSize: PAGE_SIZE, totalPages: 1 });
+        } catch { setError('No se pudieron cargar los gastos.'); }
         finally { setLoading(false); }
-    };
+    }, [token, catFilter]);
 
-    useEffect(() => { if (token) load(); }, [token]);
+    useEffect(() => { if (token) load(1, catFilter); }, [token]);
 
-    const handleCreate = async f => { await createExpense(token, f); setShowForm(false); load(); };
-    const handleEdit   = async f => { await updateExpense(token, editing.id, f); setEditing(null); load(); };
-    const handleDelete = async () => { await deleteExpense(token, toDelete.id); setToDelete(null); load(); };
-    const closeModal   = () => { setShowForm(false); setEditing(null); };
+    const handlePage    = p  => { setPage(p); load(p, catFilter); };
+    const handleCat     = c  => { setCatFilter(c); setPage(1); load(1, c); };
+    const handleCreate  = async f => { await createExpense(token, f); setShowForm(false); load(page, catFilter); };
+    const handleEdit    = async f => { await updateExpense(token, editing.id, f); setEditing(null); load(page, catFilter); };
+    const handleDelete  = async () => { await deleteExpense(token, toDelete.id); setToDelete(null); load(page, catFilter); };
+    const closeModal    = () => { setShowForm(false); setEditing(null); };
 
-    const filtered = expenses.filter(e => {
-        const q = search.toLowerCase();
-        const matchSearch = !q ||
-            (e.description || '').toLowerCase().includes(q) ||
-            (e.category || '').toLowerCase().includes(q);
-        const matchCat = catFilter === 'all' || e.category === catFilter;
-        return matchSearch && matchCat;
-    });
-
+    // Búsqueda local sobre la página actual (el filtrado por categoría es server-side)
+    const filtered = search
+        ? expenses.filter(e => {
+            const q = search.toLowerCase();
+            return (e.description || '').toLowerCase().includes(q) ||
+                   (e.category    || '').toLowerCase().includes(q);
+          })
+        : expenses;
     const total         = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
     const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);
 
@@ -111,21 +121,18 @@ export default function Expenses() {
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button
                                 className={`filter-chip${catFilter === 'all' ? ' active' : ''}`}
-                                onClick={() => setCatFilter('all')}
+                                onClick={() => handleCat('all')}
                             >
                                 Todas
-                                <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>{expenses.length}</span>
+                                <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>{pagination.total}</span>
                             </button>
                             {usedCats.map(cat => (
                                 <button
                                     key={cat}
                                     className={`filter-chip${catFilter === cat ? ' active' : ''}`}
-                                    onClick={() => setCatFilter(cat)}
+                                    onClick={() => handleCat(cat)}
                                 >
                                     {CAT_LABELS[cat] || cat}
-                                    <span style={{ marginLeft: 5, opacity: 0.65, fontSize: 11 }}>
-                                        {expenses.filter(e => e.category === cat).length}
-                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -201,6 +208,13 @@ export default function Expenses() {
                                 })}
                             </tbody>
                         </table>
+                        <Pagination
+                            page={pagination.page}
+                            totalPages={pagination.totalPages}
+                            total={pagination.total}
+                            pageSize={pagination.pageSize}
+                            onPage={handlePage}
+                        />
                     </div>
                 )}
             </main>

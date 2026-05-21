@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import crypto from 'crypto';
 
 const recalcQuoteTotals = async (conn, quoteId) => {
     const [items] = await conn.query(
@@ -75,12 +76,7 @@ export const createQuote = async (req, res) => {
 
 // Listar presupuestos
 export const getQuotes = async (req, res) => {
-    // Marcar expirados
-    await pool.query(
-        `UPDATE quotes SET status = 'expired'
-         WHERE user_id = ? AND status = 'sent' AND expiry_date < CURDATE() AND is_deleted = 0`,
-        [req.user.id]
-    );
+    // El marcado de presupuestos expirados lo gestiona el scheduler diario
     try {
         const [rows] = await pool.query(
             `SELECT q.*, c.name AS client_name FROM quotes q
@@ -209,13 +205,14 @@ export const convertQuoteToInvoice = async (req, res) => {
         const number = `${cfg.prefix}-${currentYear}-${padded}`;
         await conn.query(`UPDATE invoice_settings SET next_number = next_number + 1 WHERE user_id = ?`, [req.user.id]);
 
+        const publicToken = crypto.randomBytes(32).toString('hex');
         const [result] = await conn.query(
             `INSERT INTO invoices (user_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
-              issue_date, due_date, status, notes, subtotal_amount, tax_amount, total_amount)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+              issue_date, due_date, status, notes, subtotal_amount, tax_amount, total_amount, public_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
             [req.user.id, quote.client_id, quote.project_id, number, seq, currentYear,
              issue_date || quote.issue_date, due_date || quote.expiry_date,
-             quote.notes, quote.subtotal_amount, quote.tax_amount, quote.total_amount]
+             quote.notes, quote.subtotal_amount, quote.tax_amount, quote.total_amount, publicToken]
         );
         const invoiceId = result.insertId;
 

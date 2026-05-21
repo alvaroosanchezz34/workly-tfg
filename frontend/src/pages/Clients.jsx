@@ -1,57 +1,64 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ClientForm from '../components/ClientForm';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { getClients, createClient, updateClient, deleteClient } from '../api/clients';
 import { Plus, Search, Users, Building2, Mail, Phone, ChevronRight } from 'lucide-react';
 import { usePlanLimit } from '../hooks/usePlanLimit';
 
-const COLORS = ['#1976D2','#4CAF50','#FF9800','#0288D1','#9C27B0','#F44336'];
-const colorFor = id => COLORS[id % COLORS.length];
-const initials = name => name?.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() || '?';
+const PAGE_SIZE = 20;
+const COLORS    = ['#1976D2','#4CAF50','#FF9800','#0288D1','#9C27B0','#F44336'];
+const colorFor  = id => COLORS[id % COLORS.length];
+const initials  = name => name?.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() || '?';
 
 const Clients = () => {
     const { token } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const [clients,  setClients]  = useState([]);
-    const [filtered, setFiltered] = useState([]);
-    const [loading,  setLoading]  = useState(true);
-    const [search,   setSearch]   = useState('');
-    const [showForm, setShowForm] = useState(false);
-    const [editing,  setEditing]  = useState(null);
-    const [toDelete, setToDelete] = useState(null);
+    const navigate  = useNavigate();
+
+    const [clients,    setClients]    = useState([]);
+    const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 });
+    const [loading,    setLoading]    = useState(true);
+    const [search,     setSearch]     = useState('');
+    const [page,       setPage]       = useState(1);
+    const [showForm,   setShowForm]   = useState(false);
+    const [editing,    setEditing]    = useState(null);
+    const [toDelete,   setToDelete]   = useState(null);
     const { checkResponse, UpgradePrompt } = usePlanLimit();
 
-    const load = async () => {
+    const load = useCallback(async (p = page, q = search) => {
         setLoading(true);
-        try { const d = await getClients(token); setClients(d); setFiltered(d); }
-        finally { setLoading(false); }
-    };
+        try {
+            const params = new URLSearchParams({ page: p, limit: PAGE_SIZE });
+            if (q) params.set('search', q);
+            const res  = await getClients(token, params.toString());
+            setClients(res.data ?? []);
+            setPagination(res.pagination ?? { total: 0, page: p, pageSize: PAGE_SIZE, totalPages: 1 });
+        } finally { setLoading(false); }
+    }, [token, page, search]);
 
-    useEffect(() => { if (token) load(); }, [token]);
+    useEffect(() => { if (token) load(1, search); }, [token]);
 
+    // Búsqueda server-side con debounce
     useEffect(() => {
-        const q = search.toLowerCase();
-        setFiltered(clients.filter(c =>
-            c.name.toLowerCase().includes(q) ||
-            (c.email||'').toLowerCase().includes(q) ||
-            (c.company||'').toLowerCase().includes(q) ||
-            (c.phone||'').toLowerCase().includes(q)
-        ));
-    }, [search, clients]);
+        const t = setTimeout(() => { setPage(1); load(1, search); }, 350);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    const handlePage = p => { setPage(p); load(p, search); };
 
     const handleCreate = async f => {
         const res = await createClient(token, f);
         if (!await checkResponse(res)) return;
         if (!res.ok) { const d = await res.json(); return alert(d.message); }
-        setShowForm(false); load();
+        setShowForm(false); load(1, search);
     };
-    const handleEdit   = async f => { await updateClient(token, editing.id, f); setEditing(null); load(); };
-    const handleDelete = async () => { await deleteClient(token, toDelete.id); setToDelete(null); load(); };
+    const handleEdit   = async f => { await updateClient(token, editing.id, f); setEditing(null); load(page, search); };
+    const handleDelete = async () => { await deleteClient(token, toDelete.id); setToDelete(null); load(page, search); };
 
-    const openEdit = (e, c) => { e.stopPropagation(); setEditing(c); };
+    const openEdit   = (e, c) => { e.stopPropagation(); setEditing(c); };
     const openDelete = (e, c) => { e.stopPropagation(); setToDelete(c); };
 
     return (
@@ -62,7 +69,7 @@ const Clients = () => {
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Clientes</h1>
-                        <p className="page-subtitle">{clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}</p>
+                        <p className="page-subtitle">{pagination.total} cliente{pagination.total !== 1 ? 's' : ''} registrado{pagination.total !== 1 ? 's' : ''}</p>
                     </div>
                     <button className="btn btn-primary" onClick={() => setShowForm(true)}>
                         <Plus size={15}/> Nuevo cliente
@@ -73,14 +80,14 @@ const Clients = () => {
                 <div className="search-bar" style={{ marginBottom:18 }}>
                     <Search size={14} className="search-bar-icon"/>
                     <input className="form-input" style={{ paddingLeft:34 }}
-                        placeholder="Buscar por nombre, email, empresa o teléfono…"
+                        placeholder="Buscar por nombre, email o empresa…"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
 
                 {/* TABLA */}
                 {loading ? (
                     <div className="table-wrap">
-                        {[...Array(4)].map((_,i) => (
+                        {[...Array(5)].map((_,i) => (
                             <div key={i} style={{ padding:'13px 16px', borderBottom:'1px solid #F5F5F5', display:'flex', gap:12, alignItems:'center' }}>
                                 <div className="skeleton" style={{ width:36, height:36, borderRadius:8 }}/>
                                 <div style={{ flex:1 }}>
@@ -90,12 +97,12 @@ const Clients = () => {
                             </div>
                         ))}
                     </div>
-                ) : filtered.length === 0 ? (
+                ) : clients.length === 0 ? (
                     <div className="table-wrap">
                         <div className="empty-state">
                             <div className="empty-icon"><Users size={22}/></div>
                             <p className="empty-title">{search ? 'Sin resultados' : 'Sin clientes aún'}</p>
-                            <p className="empty-desc">{search ? 'Prueba con otro término de búsqueda' : 'Añade tu primer cliente para empezar a gestionar proyectos y facturas'}</p>
+                            <p className="empty-desc">{search ? 'Prueba con otro término' : 'Añade tu primer cliente para empezar a gestionar proyectos y facturas'}</p>
                             {!search && <button className="btn btn-primary" style={{ marginTop:10 }} onClick={() => setShowForm(true)}><Plus size={14}/>Nuevo cliente</button>}
                         </div>
                     </div>
@@ -111,12 +118,10 @@ const Clients = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map((c, idx) => (
-                                    <tr
-                                        key={c.id}
+                                {clients.map((c, idx) => (
+                                    <tr key={c.id}
                                         style={{ animationDelay:`${idx*25}ms`, cursor:'pointer' }}
-                                        onClick={() => navigate(`/clients/${c.id}`)}
-                                    >
+                                        onClick={() => navigate(`/clients/${c.id}`)}>
                                         <td>
                                             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                                                 <div style={{ width:36, height:36, borderRadius:8, background:`${colorFor(c.id)}14`, color:colorFor(c.id), display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:600, flexShrink:0 }}>
@@ -124,17 +129,15 @@ const Clients = () => {
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight:500, display:'flex', alignItems:'center', gap:5 }}>
-                                                        {c.name}
-                                                        <ChevronRight size={12} style={{ color:'var(--text-disabled)' }} />
+                                                        {c.name}<ChevronRight size={12} style={{ color:'var(--text-disabled)' }}/>
                                                     </div>
                                                     {c.document && <div style={{ fontSize:11.5, color:'var(--text-disabled)' }}>{c.document}</div>}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
-                                            {c.company
-                                                ? <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--text-secondary)' }}><Building2 size={12}/>{c.company}</span>
-                                                : <span style={{ color:'var(--text-disabled)' }}>—</span>}
+                                        <td>{c.company
+                                            ? <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--text-secondary)' }}><Building2 size={12}/>{c.company}</span>
+                                            : <span style={{ color:'var(--text-disabled)' }}>—</span>}
                                         </td>
                                         <td>
                                             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
@@ -150,12 +153,19 @@ const Clients = () => {
                                 ))}
                             </tbody>
                         </table>
+                        <Pagination
+                            page={pagination.page}
+                            totalPages={pagination.totalPages}
+                            total={pagination.total}
+                            pageSize={pagination.pageSize}
+                            onPage={handlePage}
+                        />
                     </div>
                 )}
             </main>
 
             <Modal open={showForm || !!editing} title={editing ? 'Editar cliente' : 'Nuevo cliente'} onClose={() => { setShowForm(false); setEditing(null); }}>
-                <ClientForm initialData={editing} onSubmit={editing ? handleEdit : handleCreate} onCancel={() => { setShowForm(false); setEditing(null); }} />
+                <ClientForm initialData={editing} onSubmit={editing ? handleEdit : handleCreate} onCancel={() => { setShowForm(false); setEditing(null); }}/>
             </Modal>
 
             <Modal open={!!toDelete} title="Eliminar cliente" onClose={() => setToDelete(null)}>

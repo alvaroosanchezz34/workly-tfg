@@ -7,6 +7,36 @@ const getQuarterMonths = q => ({ '1': [1,3], '2': [4,6], '3': [7,9], '4': [10,12
 
 const MONTH_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+// Construye condiciones WHERE completamente parametrizadas (sin interpolación de input)
+// invConds / expConds son arrays de strings SQL con literales de código fijo.
+// Los valores de usuario siempre van en los arrays de params.
+const buildInvoiceConditions = (userId, year, quarter) => {
+    const conds  = [
+        'i.user_id = ?',
+        'YEAR(i.issue_date) = ?',
+        "i.status IN ('sent','paid','overdue')",
+        'i.is_deleted = 0',
+    ];
+    const params = [userId, year];
+    if (quarter) {
+        const [m1, m2] = getQuarterMonths(String(quarter));
+        conds.push('MONTH(i.issue_date) BETWEEN ? AND ?');
+        params.push(m1, m2);
+    }
+    return { where: conds.join(' AND '), params };
+};
+
+const buildExpenseConditions = (userId, year, quarter) => {
+    const conds  = ['e.user_id = ?', 'YEAR(e.date) = ?', 'e.is_deleted = 0'];
+    const params = [userId, year];
+    if (quarter) {
+        const [m1, m2] = getQuarterMonths(String(quarter));
+        conds.push('MONTH(e.date) BETWEEN ? AND ?');
+        params.push(m1, m2);
+    }
+    return { where: conds.join(' AND '), params };
+};
+
 // ── GET /api/accounting/summary ───────────────────────────
 export const getSummary = async (req, res) => {
     const userId  = req.user.id;
@@ -14,19 +44,8 @@ export const getSummary = async (req, res) => {
     const quarter = req.query.quarter ? parseInt(req.query.quarter) : null;
 
     try {
-        // Construir filtro de fecha
-        let invWhere = `i.user_id = ? AND YEAR(i.issue_date) = ? AND i.status IN ('sent','paid','overdue') AND i.is_deleted = 0`;
-        let expWhere = `e.user_id = ? AND YEAR(e.date) = ? AND e.is_deleted = 0`;
-        const invParams = [userId, year];
-        const expParams = [userId, year];
-
-        if (quarter) {
-            const [m1, m2] = getQuarterMonths(String(quarter));
-            invWhere += ` AND MONTH(i.issue_date) BETWEEN ? AND ?`;
-            expWhere += ` AND MONTH(e.date) BETWEEN ? AND ?`;
-            invParams.push(m1, m2);
-            expParams.push(m1, m2);
-        }
+        const inv = buildInvoiceConditions(userId, year, quarter);
+        const exp = buildExpenseConditions(userId, year, quarter);
 
         const [incomeRows] = await pool.query(
             `SELECT DATE_FORMAT(i.issue_date,'%Y-%m') AS month,
@@ -35,9 +54,10 @@ export const getSummary = async (req, res) => {
                     COALESCE(SUM(i.total_amount),0)    AS total_facturado,
                     COALESCE(SUM(i.paid_amount),0)     AS total_cobrado,
                     COUNT(*) AS num_facturas
-             FROM invoices i WHERE ${invWhere}
+             FROM invoices i
+             WHERE ${inv.where}
              GROUP BY month ORDER BY month ASC`,
-            invParams
+            inv.params
         );
 
         const [[totalsIncome]] = await pool.query(
@@ -45,14 +65,16 @@ export const getSummary = async (req, res) => {
                     COALESCE(SUM(tax_amount),0)      AS iva_repercutido,
                     COALESCE(SUM(total_amount),0)    AS total_facturado,
                     COALESCE(SUM(paid_amount),0)     AS total_cobrado
-             FROM invoices i WHERE ${invWhere}`,
-            invParams
+             FROM invoices i
+             WHERE ${inv.where}`,
+            inv.params
         );
 
         const [[totalsExpense]] = await pool.query(
             `SELECT COALESCE(SUM(amount),0) AS total_gastos, COUNT(*) AS num_gastos
-             FROM expenses e WHERE ${expWhere}`,
-            expParams
+             FROM expenses e
+             WHERE ${exp.where}`,
+            exp.params
         );
 
         const baseImponible  = num(totalsIncome?.base_imponible);

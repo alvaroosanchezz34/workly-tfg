@@ -1,6 +1,7 @@
 // EXPENSES CONTROLLER
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { getPagination, paginatedResponse } from '../utils/paginate.js';
 
 // Crear gasto
 export const createExpense = async (req, res) => {
@@ -30,19 +31,28 @@ export const createExpense = async (req, res) => {
     }
 };
 
-// Obtener gastos del usuario (NO eliminados)
+// Obtener gastos del usuario (NO eliminados) — paginado
 export const getExpenses = async (req, res) => {
+    const { category, date_from, date_to } = req.query;
+    const { page, pageSize, limit, offset } = getPagination(req.query);
+
     try {
+        let where  = `WHERE user_id = ? AND is_deleted = 0`;
+        const params = [req.user.id];
+
+        if (category)  { where += ` AND category = ?`;   params.push(category); }
+        if (date_from) { where += ` AND date >= ?`;       params.push(date_from); }
+        if (date_to)   { where += ` AND date <= ?`;       params.push(date_to); }
+
+        const [[{ total }]] = await pool.query(
+            `SELECT COUNT(*) AS total FROM expenses ${where}`, params
+        );
         const [rows] = await pool.query(
-            `SELECT *
-       FROM expenses
-       WHERE user_id = ?
-       AND is_deleted = 0
-       ORDER BY date DESC`,
-            [req.user.id]
+            `SELECT * FROM expenses ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
         );
 
-        res.json(rows);
+        res.json(paginatedResponse(rows, total, page, pageSize));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

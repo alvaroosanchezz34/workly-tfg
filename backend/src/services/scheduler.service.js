@@ -1,5 +1,6 @@
 // backend/src/services/scheduler.service.js
-import cron from 'node-cron';
+import cron   from 'node-cron';
+import crypto from 'crypto';
 import { pool } from '../config/db.js';
 import { sendInvoiceEmail } from './email.service.js';
 
@@ -14,11 +15,12 @@ export const initScheduler = () => {
     cron.schedule('0 9 * * *', async () => {
         console.log('[Scheduler] Ejecutando jobs diarios...');
         await markOverdueInvoices();
+        await markExpiredQuotes();
         await sendOverdueReminders();
         await processRecurringInvoices();
     }, { timezone: 'Europe/Madrid' });
 
-    console.log('[Scheduler] Jobs registrados: marcado de vencidas (09:00), recordatorios (09:00), recurrentes (09:00)');
+    console.log('[Scheduler] Jobs registrados: marcado de vencidas (09:00), presupuestos expirados (09:00), recordatorios (09:00), recurrentes (09:00)');
 };
 
 // ── Marcar facturas como vencidas ─────────────────────────
@@ -35,6 +37,23 @@ const markOverdueInvoices = async () => {
             console.log(`[Scheduler] ${result.affectedRows} facturas marcadas como vencidas`);
     } catch (err) {
         console.error('[Scheduler] Error marcando vencidas:', err.message);
+    }
+};
+
+// ── Marcar presupuestos expirados ─────────────────────────
+const markExpiredQuotes = async () => {
+    try {
+        const [result] = await pool.query(
+            `UPDATE quotes
+             SET status = 'expired'
+             WHERE status = 'sent'
+               AND expiry_date < CURDATE()
+               AND is_deleted = 0`
+        );
+        if (result.affectedRows > 0)
+            console.log(`[Scheduler] ${result.affectedRows} presupuestos marcados como expirados`);
+    } catch (err) {
+        console.error('[Scheduler] Error marcando presupuestos expirados:', err.message);
     }
 };
 
@@ -193,16 +212,18 @@ const generateFromRecurring = async rec => {
         const dueDate   = new Date();
         dueDate.setDate(dueDate.getDate() + 30);
 
+        const publicToken = crypto.randomBytes(32).toString('hex');
         const [result] = await conn.query(
             `INSERT INTO invoices
              (user_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
-              issue_date, due_date, status, subtotal_amount, tax_amount, total_amount, notes)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              issue_date, due_date, status, subtotal_amount, tax_amount, total_amount, notes, public_token)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [rec.user_id, rec.client_id, rec.project_id, num, seq, year,
              issueDate.toISOString().split('T')[0],
              dueDate.toISOString().split('T')[0],
              'draft', rec.subtotal_amount, rec.tax_amount, rec.total_amount,
-             `Generada automáticamente desde factura recurrente #${rec.id}`]
+             `Generada automáticamente desde factura recurrente #${rec.id}`,
+             publicToken]
         );
         const invoiceId = result.insertId;
 

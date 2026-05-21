@@ -1,8 +1,9 @@
 import { fetchWithAuth } from '../context/fetchWithAuth';
 const API = import.meta.env.VITE_API_URL;
 
-export const getClients = async token => {
-    const res = await fetchWithAuth(`${API}/clients`, token);
+export const getClients = async (token, queryString = '') => {
+    const url = queryString ? `${API}/clients?${queryString}` : `${API}/clients`;
+    const res = await fetchWithAuth(url, token);
     if (!res.ok) throw new Error('Error al cargar clientes');
     return res.json();
 };

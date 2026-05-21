@@ -58,7 +58,11 @@ export default function Projects() {
 
     const load = async () => {
         setLoading(true); setError('');
-        try { const [p, c] = await Promise.all([getProjects(token), getClients(token)]); setProjects(p); setClients(c); }
+        try {
+            const [p, c] = await Promise.all([getProjects(token), getClients(token)]);
+            setProjects(p);
+            setClients(Array.isArray(c) ? c : (c?.data ?? []));
+        }
         catch { setError('No se pudieron cargar los proyectos.'); }
         finally { setLoading(false); }
     };

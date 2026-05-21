@@ -45,3 +45,8 @@ export const downloadInvoicePDF = async (token, id) => {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 };
+export const sendInvoiceByEmail = (token, id, to = null) =>
+    fetchWithAuth(`${BASE}/${id}/send`, token, {
+        method: 'POST',
+        body: JSON.stringify(to ? { to } : {}),
+    }).then(r => r.json());

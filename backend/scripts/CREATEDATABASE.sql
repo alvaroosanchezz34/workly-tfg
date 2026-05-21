@@ -473,6 +473,24 @@ CREATE TABLE IF NOT EXISTS recurring_invoice_items (
 );
 
 -- ══════════════════════════════════════════════════════════
+-- BILLING EVENTS (registro de eventos de Stripe)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS billing_events (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  user_id          INT NOT NULL,
+  stripe_event_id  VARCHAR(100) NOT NULL,
+  event_type       VARCHAR(100) NOT NULL,
+  amount           DECIMAL(10,2) DEFAULT NULL,
+  status           VARCHAR(50)  DEFAULT NULL,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uq_stripe_event (stripe_event_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_billing_events_user ON billing_events(user_id);
+
+-- ══════════════════════════════════════════════════════════
 -- ÍNDICES para mejorar rendimiento
 -- ══════════════════════════════════════════════════════════
 CREATE INDEX idx_invoices_user       ON invoices(user_id);

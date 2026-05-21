@@ -19,6 +19,7 @@ import companyRoutes         from './routes/company.routes.js';
 import usersRoutes           from './routes/users.routes.js';
 import exportRoutes          from './routes/export.routes.js';
 import accountingRoutes      from './routes/accounting.routes.js';
+import publicInvoiceRoutes   from './routes/publicInvoice.routes.js';
 import { stripeWebhook, getPlans, getBillingStatus, createCheckout, createPortal } from './controllers/billing.controller.js';
 import { authenticate } from './middlewares/auth.middleware.js';
 
@@ -71,6 +72,7 @@ app.use('/api/activity-logs',      activityLogsRoutes);
 app.use('/api/services',           servicesRoutes);
 app.use('/api/export',             exportRoutes);
 app.use('/api/accounting',         accountingRoutes);
+app.use('/api/public',             publicInvoiceRoutes);  // sin autenticación
 
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 

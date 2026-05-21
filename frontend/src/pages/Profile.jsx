@@ -10,14 +10,15 @@ const Profile = () => {
     const avatarInputRef = useRef(null);
 
     const [form, setForm] = useState({
-        name:         user?.name         || '',
-        email:        user?.email        || '',
-        phone:        user?.phone        || '',
-        company_name: user?.company_name || '',
-        avatar_url:   user?.avatar_url   || '',
-        language:     user?.language     || 'es',
-        timezone:     user?.timezone     || 'Europe/Madrid',
-        password:     '',
+        name:             user?.name         || '',
+        email:            user?.email        || '',
+        phone:            user?.phone        || '',
+        company_name:     user?.company_name || '',
+        avatar_url:       user?.avatar_url   || '',
+        language:         user?.language     || 'es',
+        timezone:         user?.timezone     || 'Europe/Madrid',
+        current_password: '',
+        password:         '',
     });
 
     const [loading, setLoading] = useState(false);
@@ -31,11 +32,14 @@ const Profile = () => {
         setLoading(true); setSuccess(false); setError('');
         try {
             const payload = { ...form };
-            // No enviar contraseña vacía
-            if (!payload.password) delete payload.password;
+            // No enviar campos de contraseña si no se quiere cambiar
+            if (!payload.password) {
+                delete payload.password;
+                delete payload.current_password;
+            }
             const updated = await updateProfile(token, payload);
             login(token, localStorage.getItem('refreshToken'), updated);
-            setForm(f => ({ ...f, password: '' }));
+            setForm(f => ({ ...f, password: '', current_password: '' }));
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3500);
         } catch (err) {
@@ -188,10 +192,16 @@ const Profile = () => {
                                 Cambiar contraseña
                             </h3>
                             <Input
+                                label="Contraseña actual"
+                                name="current_password" type="password"
+                                value={form.current_password} onChange={set}
+                                placeholder="Introduce tu contraseña actual"
+                            />
+                            <Input
                                 label="Nueva contraseña (dejar vacío para no cambiar)"
                                 name="password" type="password"
                                 value={form.password} onChange={set}
-                                placeholder="Mínimo 8 caracteres"
+                                placeholder="Mínimo 6 caracteres"
                             />
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 20, marginTop: 8, borderTop: '1px solid var(--border)' }}>

@@ -12,12 +12,16 @@ export const UIProvider = ({ children }) => {
         if (!token || !isAuthenticated) return;
         try {
             const API = import.meta.env.VITE_API_URL;
+            const headers = { Authorization: `Bearer ${token}` };
             const [invRes, projRes] = await Promise.all([
-                fetch(`${API}/invoices`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API}/projects`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API}/invoices?limit=100`, { headers }),
+                fetch(`${API}/projects`,           { headers }),
             ]);
-            const invoices = invRes.ok  ? await invRes.json()  : [];
-            const projects = projRes.ok ? await projRes.json() : [];
+            const invData  = invRes.ok  ? await invRes.json()  : {};
+            const projData = projRes.ok ? await projRes.json() : [];
+            // invoices devuelve {data, pagination} — extraer el array
+            const invoices = Array.isArray(invData)      ? invData      : (invData?.data   ?? []);
+            const projects = Array.isArray(projData)     ? projData     : (projData?.data  ?? []);
             const today = new Date();
             const in7   = new Date(); in7.setDate(today.getDate() + 7);
             const notifs = [];

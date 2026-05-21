@@ -2,6 +2,7 @@
 import { pool } from '../config/db.js';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { sendTeamInviteEmail } from '../services/email.service.js';
 
 // ── Crear empresa ─────────────────────────────────────────
 export const createCompany = async (req, res) => {
@@ -117,7 +118,7 @@ export const inviteMember = async (req, res) => {
         if (!user) {
             // Crear usuario con contraseña temporal
             const tempPassword = crypto.randomBytes(8).toString('hex');
-            const hashed = await bcrypt.hash(tempPassword, 10);
+            const hashed = await bcrypt.hash(tempPassword, 12);
             const [result] = await conn.query(
                 `INSERT INTO users (name, email, password, role, company_id)
                  VALUES (?, ?, ?, ?, ?)`,
@@ -144,11 +145,23 @@ export const inviteMember = async (req, res) => {
         );
 
         await conn.commit();
+
+        // FIX: enviar contraseña temporal por email, NUNCA devolverla en la respuesta
+        if (user.tempPassword && process.env.RESEND_API_KEY) {
+            const [[company]] = await pool.query(`SELECT name FROM companies WHERE id = ?`, [req.company.id]);
+            sendTeamInviteEmail({
+                to:          email,
+                name,
+                companyName: company?.name || 'tu empresa',
+                tempPassword: user.tempPassword,
+            }).catch(e => console.error('[inviteMember] Email error:', e.message));
+        }
+
         res.status(201).json({
-            message: 'Miembro invitado',
-            userId: user.id,
+            message: 'Miembro invitado. Se le ha enviado un email con sus credenciales.',
+            userId:      user.id,
             inviteToken,
-            tempPassword: user.tempPassword || null, // Solo en usuarios nuevos
+            // tempPassword ELIMINADO de la respuesta por seguridad
         });
     } catch (err) {
         await conn.rollback();
