@@ -42,6 +42,7 @@
   - [🎨 Design System](#-design-system)
   - [🛡️ Roles y permisos](#️-roles-y-permisos)
   - [🧹 Decisiones técnicas y clean code](#-decisiones-técnicas-y-clean-code)
+  - [� Documentación](#-documentación)
   - [📄 Licencia](#-licencia)
 
 ---
@@ -511,6 +512,28 @@ Dentro del **modo empresa**, existe además el rol de empresa:
 - **ESModules en backend** — el proyecto usa `"type": "module"` con imports/exports nativos en lugar de CommonJS.
 - **Variables de entorno tipadas** — `plans.js` centraliza toda la configuración de límites, evitando magic numbers dispersos en los controladores.
 - **Componentes UI reutilizables** — `FormComponents.jsx`, `Modal.jsx`, `MetricCard.jsx`, `Pagination.jsx` y `AlertBox.jsx` se usan en todas las páginas para mantener consistencia visual sin duplicar código.
+
+---
+
+## 📚 Documentación
+
+La documentación técnica del proyecto está publicada con **Docusaurus** y disponible en:
+
+**🔗 [https://docusaurus-rose-seven.vercel.app](https://docusaurus-rose-seven.vercel.app)**
+
+Incluye:
+
+- Arquitectura de la aplicación (cliente/servidor, lenguajes, versiones)
+- Referencia completa de la API REST (todos los endpoints)
+- Autenticación, roles y sistema de planes
+- Estructura del frontend y componentes principales
+- Tutorial de uso para el usuario final
+- Guía de lanzamiento en local
+- Proceso de despliegue en la nube (Vercel + Railway)
+- Estrategia de ramas y commits de GitHub
+- Decisiones de diseño técnico
+
+La documentación se actualiza automáticamente en cada push a `main` mediante despliegue continuo en Vercel. El código fuente de la documentación está en la carpeta [`docs-site/`](./docs-site).
 
 ---
 
