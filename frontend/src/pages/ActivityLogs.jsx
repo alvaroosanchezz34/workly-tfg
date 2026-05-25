@@ -1,60 +1,63 @@
+// frontend/src/pages/ActivityLogs.jsx
 import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getActivityLogs } from '../api/activityLogs';
 import { FilePlus, FileEdit, Trash2, RotateCcw, Activity } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Pagination from '../components/Pagination';
+import useIsMobile from '../hooks/useIsMobile';
 
 const PAGE_SIZE = 50;
 
 const ACTION_META = {
-    created:  { icon: <FilePlus  size={13} />, cls: 'badge badge-paid',    label: 'Creado'     },
-    updated:  { icon: <FileEdit  size={13} />, cls: 'badge badge-sent',    label: 'Editado'    },
-    deleted:  { icon: <Trash2   size={13} />, cls: 'badge badge-overdue', label: 'Eliminado'  },
-    restored: { icon: <RotateCcw size={13} />, cls: 'badge badge-pending', label: 'Restaurado' },
+    created:  { icon: <FilePlus  size={13}/>, cls: 'badge badge-paid',    label: 'Creado'     },
+    updated:  { icon: <FileEdit  size={13}/>, cls: 'badge badge-sent',    label: 'Editado'    },
+    deleted:  { icon: <Trash2   size={13}/>,  cls: 'badge badge-overdue', label: 'Eliminado'  },
+    restored: { icon: <RotateCcw size={13}/>, cls: 'badge badge-pending', label: 'Restaurado' },
 };
 
 const ENTITY_LABEL = {
     client: 'Cliente', project: 'Proyecto', invoice: 'Factura',
-    expense: 'Gasto',  service: 'Servicio', quote: 'Presupuesto',
+    expense: 'Gasto', service: 'Servicio', quote: 'Presupuesto',
     credit_note: 'Nota de crédito',
 };
 
 const timeAgo = d => {
     const diff = Math.floor((Date.now() - new Date(d)) / 1000);
     if (diff < 60)    return 'Ahora mismo';
-    if (diff < 3600)  return `Hace ${Math.floor(diff / 60)} min`;
-    if (diff < 86400) return `Hace ${Math.floor(diff / 3600)} h`;
-    return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    if (diff < 3600)  return `Hace ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `Hace ${Math.floor(diff/3600)} h`;
+    return new Date(d).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 };
 
 export default function ActivityLogs() {
     const { token } = useContext(AuthContext);
-    const [logs,       setLogs]       = useState([]);
-    const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 });
-    const [loading,    setLoading]    = useState(true);
-    const [error,      setError]      = useState('');
-    const [page,       setPage]       = useState(1);
+    const isMobile  = useIsMobile();
+
+    const [logs,         setLogs]         = useState([]);
+    const [pagination,   setPagination]   = useState({ total:0, page:1, pageSize:PAGE_SIZE, totalPages:1 });
+    const [loading,      setLoading]      = useState(true);
+    const [error,        setError]        = useState('');
+    const [page,         setPage]         = useState(1);
     const [entityFilter, setEntityFilter] = useState('');
 
-    const load = useCallback(async (p = 1, entity = entityFilter) => {
+    const load = useCallback(async (p=1, entity=entityFilter) => {
         if (!token) return;
-        setLoading(true);
-        setError('');
+        setLoading(true); setError('');
         try {
-            const params = new URLSearchParams({ page: p, limit: PAGE_SIZE });
+            const params = new URLSearchParams({ page:p, limit:PAGE_SIZE });
             if (entity) params.set('entity', entity);
             const res = await getActivityLogs(token, params.toString());
             setLogs(res.data ?? []);
-            setPagination(res.pagination ?? { total: 0, page: p, pageSize: PAGE_SIZE, totalPages: 1 });
+            setPagination(res.pagination ?? { total:0, page:p, pageSize:PAGE_SIZE, totalPages:1 });
         } catch { setError('No se pudo cargar el registro de actividad.'); }
         finally { setLoading(false); }
     }, [token, entityFilter]);
 
-    useEffect(() => { load(1, ''); }, [token]);
+    useEffect(() => { load(1,''); }, [token]);
 
     const handlePage   = p => { setPage(p); load(p, entityFilter); };
-    const handleEntity = e => { setEntityFilter(e); setPage(1); load(1, e); };
+    const handleEntity = e => { setEntityFilter(e); setPage(1); load(1,e); };
 
     return (
         <div className="app-layout">
@@ -64,90 +67,87 @@ export default function ActivityLogs() {
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Registro de actividad</h1>
-                        <p className="page-subtitle">{pagination.total} acción{pagination.total !== 1 ? 'es' : ''} registrada{pagination.total !== 1 ? 's' : ''}</p>
+                        <p className="page-subtitle">{pagination.total} acción{pagination.total!==1?'es':''} registrada{pagination.total!==1?'s':''}</p>
                     </div>
-                    {/* Filtro por entidad */}
-                    <select
-                        className="form-input"
-                        style={{ width: 'auto', minWidth: 160 }}
-                        value={entityFilter}
-                        onChange={e => handleEntity(e.target.value)}
-                    >
+                    <select className="form-input" style={{ width:'auto', minWidth:160 }}
+                        value={entityFilter} onChange={e => handleEntity(e.target.value)}>
                         <option value="">Todas las entidades</option>
-                        {Object.entries(ENTITY_LABEL).map(([k, v]) => (
-                            <option key={k} value={k}>{v}</option>
-                        ))}
+                        {Object.entries(ENTITY_LABEL).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                 </div>
 
-                {error && <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>}
+                {error && <div className="alert alert-danger" style={{ marginBottom:16 }}>{error}</div>}
 
                 {loading ? (
                     <div className="table-wrap">
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5', display: 'flex', gap: 12, alignItems: 'center' }}>
-                                <div className="skeleton" style={{ width: 32, height: 32, borderRadius: 8 }} />
-                                <div style={{ flex: 1 }}>
-                                    <div className="skeleton" style={{ height: 12, width: '32%', marginBottom: 6 }} />
-                                    <div className="skeleton" style={{ height: 10, width: '20%' }} />
+                        {[...Array(6)].map((_,i) => (
+                            <div key={i} style={{ padding:'13px 16px', borderBottom:'1px solid var(--border)', display:'flex', gap:12, alignItems:'center' }}>
+                                <div className="skeleton" style={{ width:32, height:32, borderRadius:8, flexShrink:0 }}/>
+                                <div style={{ flex:1 }}>
+                                    <div className="skeleton" style={{ height:12, width:'32%', marginBottom:6 }}/>
+                                    <div className="skeleton" style={{ height:10, width:'20%' }}/>
                                 </div>
-                                <div className="skeleton" style={{ height: 10, width: 70 }} />
+                                <div className="skeleton" style={{ height:10, width:60 }}/>
                             </div>
                         ))}
                     </div>
                 ) : logs.length === 0 ? (
                     <div className="table-wrap">
                         <div className="empty-state">
-                            <div className="empty-icon"><Activity size={22} /></div>
+                            <div className="empty-icon"><Activity size={22}/></div>
                             <p className="empty-title">Sin actividad registrada</p>
                             <p className="empty-desc">Las acciones que realices en el sistema aparecerán aquí</p>
                         </div>
                     </div>
+                ) : isMobile ? (
+                    /* ── Cards móvil ── */
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                        {logs.map((log, i) => {
+                            const meta = ACTION_META[log.action] || { icon:<Activity size={13}/>, cls:'badge badge-draft', label:log.action };
+                            return (
+                                <div key={log.id} style={{ background:'var(--card-bg)', border:'1.5px solid var(--border)', borderRadius:10, padding:'12px 14px', display:'flex', gap:12, alignItems:'flex-start', animationDelay:`${i*18}ms` }}>
+                                    <span className={meta.cls} style={{ gap:5, flexShrink:0 }}>{meta.icon}{meta.label}</span>
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                        <div style={{ fontSize:13, fontWeight:500 }}>
+                                            {ENTITY_LABEL[log.entity] || log.entity}
+                                            <span style={{ color:'var(--text-disabled)', fontSize:12, marginLeft:4 }}>#{log.entity_id}</span>
+                                        </div>
+                                        {log.user_name && <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:2 }}>{log.user_name}</div>}
+                                    </div>
+                                    <div style={{ fontSize:11.5, color:'var(--text-disabled)', whiteSpace:'nowrap', flexShrink:0 }}>{timeAgo(log.created_at)}</div>
+                                </div>
+                            );
+                        })}
+                        <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} pageSize={pagination.pageSize} onPage={handlePage} />
+                    </div>
                 ) : (
+                    /* ── Tabla desktop ── */
                     <div className="table-wrap">
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Acción</th>
-                                    <th>Entidad</th>
-                                    <th>Usuario</th>
-                                    <th style={{ textAlign: 'right' }}>Cuándo</th>
+                                    <th>Acción</th><th>Entidad</th><th>Usuario</th>
+                                    <th style={{ textAlign:'right' }}>Cuándo</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {logs.map((log, i) => {
-                                    const meta = ACTION_META[log.action] || {
-                                        icon: <Activity size={13} />, cls: 'badge badge-draft', label: log.action,
-                                    };
+                                    const meta = ACTION_META[log.action] || { icon:<Activity size={13}/>, cls:'badge badge-draft', label:log.action };
                                     return (
-                                        <tr key={log.id} style={{ animationDelay: `${i * 18}ms` }}>
+                                        <tr key={log.id} style={{ animationDelay:`${i*18}ms` }}>
+                                            <td><span className={meta.cls} style={{ gap:6 }}>{meta.icon}{meta.label}</span></td>
                                             <td>
-                                                <span className={meta.cls} style={{ gap: 6 }}>
-                                                    {meta.icon}{meta.label}
-                                                </span>
+                                                <span style={{ fontWeight:500 }}>{ENTITY_LABEL[log.entity] || log.entity}</span>
+                                                <span style={{ color:'var(--text-disabled)', fontSize:12, marginLeft:5 }}>#{log.entity_id}</span>
                                             </td>
-                                            <td>
-                                                <span style={{ fontWeight: 500 }}>{ENTITY_LABEL[log.entity] || log.entity}</span>
-                                                <span style={{ color: 'var(--text-disabled)', fontSize: 12, marginLeft: 5 }}>#{log.entity_id}</span>
-                                            </td>
-                                            <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                                                {log.user_name || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
-                                            </td>
-                                            <td style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--text-disabled)' }}>
-                                                {timeAgo(log.created_at)}
-                                            </td>
+                                            <td style={{ color:'var(--text-secondary)', fontSize:13 }}>{log.user_name || <span style={{ color:'var(--text-disabled)' }}>—</span>}</td>
+                                            <td style={{ textAlign:'right', fontSize:12.5, color:'var(--text-disabled)' }}>{timeAgo(log.created_at)}</td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
-                        <Pagination
-                            page={pagination.page}
-                            totalPages={pagination.totalPages}
-                            total={pagination.total}
-                            pageSize={pagination.pageSize}
-                            onPage={handlePage}
-                        />
+                        <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} pageSize={pagination.pageSize} onPage={handlePage} />
                     </div>
                 )}
             </main>
