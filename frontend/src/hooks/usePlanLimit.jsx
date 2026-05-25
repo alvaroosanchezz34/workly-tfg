@@ -1,4 +1,4 @@
-// frontend/src/hooks/usePlanLimit.js
+// frontend/src/hooks/usePlanLimit.jsx
 import { useState } from 'react';
 import UpgradeModal from '../components/UpgradeModal';
 
