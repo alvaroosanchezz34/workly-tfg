@@ -26,6 +26,7 @@ import Estado         from './pages/Estado';
 import Billing        from './pages/Billing';
 import BillingSuccess from './pages/BillingSuccess';
 import Accounting     from './pages/Accounting';
+import CalendarPage   from './pages/Calendar';
 
 import CookieBanner        from './components/CookieBanner';
 import OnboardingChecklist from './components/OnboardingChecklist';
@@ -116,6 +117,7 @@ const AppInner = () => (
             <Route path="/billing"         element={<PrivateRoute><Billing /></PrivateRoute>} />
             <Route path="/billing/success" element={<PrivateRoute><BillingSuccess /></PrivateRoute>} />
             <Route path="/accounting"      element={<PrivateRoute><Accounting /></PrivateRoute>} />
+            <Route path="/calendar"        element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
