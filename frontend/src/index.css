@@ -1041,3 +1041,160 @@ html, body {
   60% { transform: rotate(8deg); }
   80% { transform: rotate(-6deg); }
 }
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE FIRST
+   Breakpoints: 768px (tablet), 480px (phone)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Variables mobile ── */
+:root {
+  --mobile-header-h: 56px;
+}
+
+/* ── Botón hamburguesa (solo móvil) ── */
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 200;
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ── Overlay oscuro detrás del drawer ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 45;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.15s ease;
+}
+.sidebar-overlay.visible { display: block; }
+
+@media (max-width: 768px) {
+  /* ── Mostrar toggle ── */
+  .sidebar-toggle { display: flex; }
+
+  /* ── Sidebar → drawer ── */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+    box-shadow: none;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+
+  /* ── Contenido ocupa todo el ancho ── */
+  .page-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: calc(var(--mobile-header-h) + 4px);
+  }
+
+  /* ── Page header apilado ── */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .page-header .btn { width: 100%; justify-content: center; }
+
+  /* ── Títulos más pequeños ── */
+  .page-title { font-size: 18px; }
+
+  /* ── Tablas con scroll horizontal ── */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { min-width: 560px; }
+
+  /* ── Grids de métricas: 2 columnas en tablet ── */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── Grid principal del dashboard ── */
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-half-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Kanban: scroll horizontal, columnas fijas ── */
+  .kanban-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .kanban-scroll-wrapper > div {
+    min-width: 800px;
+  }
+
+  /* ── Calendario: panel lateral debajo ── */
+  .calendar-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Modales full width en móvil ── */
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal-box {
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 92vh;
+  }
+  .modal-box-lg { max-width: 100%; }
+
+  /* ── Filtros y chips: scroll horizontal ── */
+  .filter-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+  }
+  .filter-row::-webkit-scrollbar { height: 0; }
+
+  /* ── Formularios: grids a 1 columna ── */
+  .form-grid-3, .form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Botones de acción en tablas: solo icono ── */
+  .action-label { display: none; }
+
+  /* ── Pagination simplificada ── */
+  .pagination-info { display: none; }
+
+  /* ── Cards de quick actions: 2 columnas ── */
+  .quick-actions-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-content { padding: 12px; padding-top: calc(var(--mobile-header-h) + 4px); }
+
+  /* ── Métricas: 1 columna en teléfono pequeño ── */
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* ── Page title ── */
+  .page-title { font-size: 16px; }
+
+  /* ── Modales más compactos ── */
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 14px 16px; }
+}

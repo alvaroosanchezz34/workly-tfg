@@ -1,3 +1,4 @@
+// frontend/src/pages/Dashboard.jsx
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getDashboard } from '../api/dashboard';
@@ -20,7 +21,7 @@ const STATUS_META = {
 };
 
 const SkeletonRow = () => (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}>
+    <div className="metrics-grid" style={{ display:'grid', gap:16, marginBottom:24 }}>
         {[...Array(5)].map((_,i) => (
             <div key={i} className="metric-card" style={{ height:96 }}>
                 <div className="skeleton" style={{ height:11, width:'45%', marginBottom:14 }} />
@@ -63,9 +64,7 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {error && (
-                    <AlertBox type="danger" title="Error" description={error} />
-                )}
+                {error && <AlertBox type="danger" title="Error" description={error} />}
 
                 {/* WIDGET IA */}
                 <AISummaryWidget />
@@ -86,8 +85,11 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {/* MÉTRICAS */}
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}>
+                        {/* MÉTRICAS — 5 col desktop, 2 col tablet, 2 col móvil */}
+                        <div
+                            className="metrics-grid"
+                            style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}
+                        >
                             <MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} />
                             <MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} />
                             <MetricCard title="Beneficio neto"    value={fmt(data?.profit)}    accentColor={(data?.profit ?? 0) >= 0 ? '#1976D2' : '#F44336'} icon={<DollarSign size={16}/>} />
@@ -95,8 +97,11 @@ const Dashboard = () => {
                             <MetricCard title="Fact. vencidas"    value={data?.overdueInvoices ?? 0}  accentColor="#F44336" icon={<AlertCircle size={16}/>} />
                         </div>
 
-                        {/* GRÁFICA + TOP CLIENTES */}
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:18, marginBottom:18 }}>
+                        {/* GRÁFICA + TOP CLIENTES — lado a lado desktop, apilado móvil */}
+                        <div
+                            className="dashboard-main-grid"
+                            style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:18, marginBottom:18 }}
+                        >
                             {data?.monthlyIncome?.length > 0
                                 ? <ChartCard data={data.monthlyIncome} />
                                 : (
@@ -112,7 +117,7 @@ const Dashboard = () => {
                                         Top clientes
                                     </h3>
                                     {data.topClients.map((c, i) => (
-                                        <div key={c.name} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < data.topClients.length-1 ? '1px solid #F5F5F5' : 'none' }}>
+                                        <div key={c.name} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < data.topClients.length-1 ? '1px solid var(--border)' : 'none' }}>
                                             <div style={{ width:26, height:26, borderRadius:6, background:['var(--primary-light)','var(--secondary-light)','var(--warning-light)'][i], color:['var(--primary)','var(--secondary)','var(--warning)'][i], display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
                                                 {i+1}
                                             </div>
@@ -124,8 +129,11 @@ const Dashboard = () => {
                             )}
                         </div>
 
-                        {/* PROYECTOS POR ESTADO + ACCIONES RÁPIDAS */}
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+                        {/* PROYECTOS + ACCIONES RÁPIDAS — mitad/mitad desktop, apilado móvil */}
+                        <div
+                            className="dashboard-half-grid"
+                            style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}
+                        >
                             {data?.projectsByStatus?.length > 0 && (
                                 <div className="card card-p">
                                     <h3 style={{ fontSize:13.5, fontWeight:600, marginBottom:14, color:'var(--text-primary)' }}>
@@ -134,7 +142,7 @@ const Dashboard = () => {
                                     {data.projectsByStatus.map(p => {
                                         const meta = STATUS_META[p.status] || { label:p.status, cls:'badge' };
                                         return (
-                                            <div key={p.status} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #F9F9F9' }}>
+                                            <div key={p.status} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--border)' }}>
                                                 <span className={meta.cls}><span className="badge-dot"/>{meta.label}</span>
                                                 <span style={{ fontSize:18, fontWeight:700, color:'var(--text-primary)' }}>{p.total}</span>
                                             </div>

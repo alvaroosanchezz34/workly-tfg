@@ -501,7 +501,8 @@ export default function ProjectTasks() {
                         ))}
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(240px, 1fr))', gap: 16, alignItems: 'start' }}>
+                    <div className="kanban-scroll-wrapper">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(240px, 1fr))', gap: 16, alignItems: 'start' }}>
                         {COLS.map(col => {
                             const colTasks = tasks
                                 .filter(t => t.status === col.id)
@@ -518,6 +519,7 @@ export default function ProjectTasks() {
                                 />
                             );
                         })}
+                    </div>
                     </div>
                 )}
             </main>
