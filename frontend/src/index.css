@@ -1198,3 +1198,20 @@ html, body {
   .modal-body { padding: 16px; }
   .modal-header { padding: 14px 16px; }
 }
+
+/* ── Fix crítico: evitar desbordamiento horizontal en página ── */
+@media (max-width: 768px) {
+  .page-content {
+    overflow-x: hidden;
+  }
+
+  /* Métricas: máximo 2 columnas, mínimo 140px */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Tablas de contabilidad con scroll */
+  .table-wrap table {
+    min-width: 480px;
+  }
+}
