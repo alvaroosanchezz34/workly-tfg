@@ -1,127 +1,169 @@
 // frontend/src/pages/Landing.jsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
-/* ═══════════════════════════════════════════════════════
-   DATOS
-═══════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────────────
+   DATOS REALES del proyecto
+───────────────────────────────────────────────────── */
 const FEATURES = [
-  { icon: '👥', label: 'Clientes', desc: 'CRM completo con historial, perfil y filtros en tiempo real.' },
-  { icon: '📁', label: 'Proyectos', desc: 'Kanban con drag & drop. Estado actualizado al instante.' },
-  { icon: '🧾', label: 'Facturas', desc: 'PDF profesional, envío por email y control de cobros.' },
-  { icon: '📊', label: 'Dashboard', desc: 'Métricas financieras, gráficas y alertas automáticas.' },
-  { icon: '💸', label: 'Gastos', desc: 'Registro por categoría con exportación a Excel.' },
-  { icon: '🤖', label: 'IA', desc: 'Presupuestos inteligentes, OCR de tickets y resúmenes.' },
-  { icon: '⏱️', label: 'Horas', desc: 'Timer integrado con facturación automática por hora.' },
-  { icon: '📅', label: 'Calendario', desc: 'Vencimientos de facturas y proyectos en una vista.' },
-  { icon: '🔁', label: 'Recurrentes', desc: 'Facturas automáticas con scheduler diario.' },
-  { icon: '📋', label: 'Presupuestos', desc: 'Convierte un presupuesto en factura con un clic.' },
-  { icon: '🏢', label: 'Equipo', desc: 'Multi-usuario con roles admin/técnico por empresa.' },
-  { icon: '📈', label: 'Contabilidad', desc: 'Modelos 130 y 303 pre-calculados para autónomos.' },
+  {
+    icon: '👥', title: 'Gestión de clientes',
+    desc: 'CRUD completo con búsqueda en tiempo real, historial por cliente, avatares y papelera de reciclaje.',
+  },
+  {
+    icon: '📁', title: 'Proyectos y Kanban',
+    desc: 'Tablero Kanban con drag & drop, vinculación a cliente, estados y seguimiento de tareas.',
+  },
+  {
+    icon: '🧾', title: 'Facturación completa',
+    desc: 'Facturas con IVA, descuentos y líneas de detalle. PDF profesional, número correlativo y portal público.',
+  },
+  {
+    icon: '📋', title: 'Presupuestos',
+    desc: 'Convierte un presupuesto en factura en un clic. PDF descargable y seguimiento de estado.',
+  },
+  {
+    icon: '🔁', title: 'Facturas recurrentes',
+    desc: 'Plantillas con periodicidad configurable. Generación automática diaria vía scheduler (node-cron).',
+  },
+  {
+    icon: '📝', title: 'Notas de crédito',
+    desc: 'Vinculación a factura original para corrección de importes sin eliminar el registro.',
+  },
+  {
+    icon: '💸', title: 'Control de gastos',
+    desc: 'Registro por categoría, búsqueda y exportación a Excel con ExcelJS.',
+  },
+  {
+    icon: '📊', title: 'Dashboard financiero',
+    desc: 'Ingresos, gastos, beneficio neto, top clientes y gráfica de evolución de 12 meses.',
+  },
+  {
+    icon: '📈', title: 'Contabilidad',
+    desc: 'Libro de ingresos y gastos. Modelos 130 y 303 pre-calculados para autónomos.',
+  },
+  {
+    icon: '⏱️', title: 'Control de horas',
+    desc: 'Timer integrado por proyecto con tarifa/hora y cálculo automático de ingresos.',
+  },
+  {
+    icon: '🤖', title: 'Asistente IA',
+    desc: 'Generación de presupuestos inteligentes, OCR de tickets y resúmenes automáticos del negocio.',
+  },
+  {
+    icon: '📅', title: 'Calendario',
+    desc: 'Vista mensual de vencimientos de facturas, presupuestos y proyectos.',
+  },
 ];
 
+// Planes extraídos de backend/src/config/plans.js
 const PLANS = [
   {
-    name: 'Starter',
-    price: '12.99',
-    badge: null,
-    color: '#3B82F6',
-    features: ['Clientes y proyectos ilimitados', 'Creación de facturas PDF', 'Registro de gastos', 'Dashboard básico', 'Soporte estándar'],
+    id: 'free',
+    name: 'Free',
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    highlight: false,
+    cta: 'Empieza gratis',
+    ctaHref: '/register',
+    features: [
+      'Hasta 5 clientes',
+      'Hasta 3 proyectos activos',
+      'Hasta 10 facturas/mes',
+      'Hasta 20 gastos',
+      'Descarga de PDFs',
+      'Dashboard básico',
+    ],
+    missing: ['Envío por email', 'Exportación Excel', 'Facturas recurrentes', 'Presupuestos', 'Estadísticas'],
   },
   {
+    id: 'pro',
     name: 'Pro',
-    price: '24.99',
-    badge: 'Más popular',
-    color: '#F59E0B',
-    features: ['Todo lo del Starter', 'Presupuestos y notas de crédito', 'Facturación recurrente', 'Envío email de facturas', 'Control de horas', 'Asistente IA', 'Contabilidad avanzada', 'Exportación Excel', 'Soporte prioritario'],
+    monthlyPrice: 12.99,
+    yearlyPrice: 10.39,
+    highlight: true,
+    cta: 'Prueba gratis 7 días',
+    ctaHref: '/register',
+    features: [
+      'Clientes ilimitados',
+      'Proyectos ilimitados',
+      'Facturas ilimitadas',
+      'Gastos ilimitados',
+      'Descarga de PDFs',
+      'Envío por email (Resend)',
+      'Exportación a Excel',
+      'Facturas recurrentes',
+      'Presupuestos y notas de crédito',
+      'Estadísticas avanzadas',
+      'Control de horas',
+      'Asistente IA',
+    ],
+    missing: ['Gestión de equipo'],
   },
   {
+    id: 'business',
     name: 'Business',
-    price: null,
-    badge: 'Empresas',
-    color: '#10B981',
-    features: ['Todo lo del Pro', 'Gestión de equipo', 'Roles y permisos', 'Onboarding personalizado', 'SLA garantizado', 'Funcionalidades a medida'],
+    monthlyPrice: 24.99,
+    yearlyPrice: 19.99,
+    highlight: false,
+    cta: 'Contactar',
+    ctaHref: '#contacto',
+    features: [
+      'Todo lo del plan Pro',
+      'Miembros de equipo ilimitados',
+      'Roles admin / técnico',
+      'Onboarding personalizado',
+      'Soporte dedicado',
+      'SLA garantizado',
+    ],
+    missing: [],
   },
 ];
 
-const TESTIMONIALS = [
-  { initials: 'CM', name: 'Carlos M.', role: 'Diseñador UI/UX freelance', color: '#3B82F6', stars: 5, text: 'Antes tardaba horas en facturar. Ahora genero una factura profesional en 2 minutos y se la envío al cliente desde la propia app. Completamente diferente.' },
-  { initials: 'LP', name: 'Laura P.', role: 'Consultora de marketing', color: '#F59E0B', stars: 5, text: 'El dashboard me da claridad total. Sé en tiempo real cuánto he facturado, cuánto me deben y cuánto llevo gastado. Sin hojas de cálculo.' },
-  { initials: 'DR', name: 'David R.', role: 'Desarrollador web', color: '#10B981', stars: 5, text: 'El Kanban de proyectos con drag & drop es lo que necesitaba. Puedo ver el estado de todo sin usar cinco herramientas distintas. Brutal.' },
-  { initials: 'AS', name: 'Ana S.', role: 'Fotógrafa profesional', color: '#8B5CF6', stars: 5, text: 'El control de horas me ha ayudado a valorar mejor mi trabajo. Ahora sé exactamente cuánto tiempo dedico a cada proyecto y cobro lo que corresponde.' },
+const STEPS = [
+  { n: '01', title: 'Crea tu cuenta', desc: 'Registro en menos de 60 segundos. Sin tarjeta de crédito.' },
+  { n: '02', title: 'Configura tu empresa', desc: 'Añade tu logo, NIF, dirección y datos fiscales.' },
+  { n: '03', title: 'Añade clientes y proyectos', desc: 'Importa o crea tus clientes y vincula proyectos.' },
+  { n: '04', title: 'Empieza a facturar', desc: 'Genera tu primera factura PDF y envíala por email.' },
 ];
 
-const STATS = [
-  { value: 12, suffix: '+', label: 'Módulos integrados' },
-  { value: 100, suffix: '%', label: 'Código propio, sin lock-in' },
-  { value: 59, suffix: '', label: 'Tests automatizados' },
-  { value: 0, suffix: '€', label: 'Para empezar hoy' },
+const TECH = [
+  'Node.js + Express', 'React 19 + Vite', 'MySQL + JWT', 'Stripe', 'Resend', 'OpenAI', 'PDFKit', 'ExcelJS',
 ];
 
-/* ═══════════════════════════════════════════════════════
+/* ─────────────────────────────────────────────────────
    HOOKS
-═══════════════════════════════════════════════════════ */
+───────────────────────────────────────────────────── */
 const useInView = (threshold = 0.1) => {
   const ref = useRef(null);
-  const [inView, setInView] = useState(false);
+  const [v, setV] = useState(false);
   useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setInView(true); }, { threshold });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) setV(true); }, { threshold });
+    if (ref.current) o.observe(ref.current);
+    return () => o.disconnect();
   }, [threshold]);
-  return [ref, inView];
+  return [ref, v];
 };
 
-const useCountUp = (target, duration = 1600, active = false) => {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let start = null;
-    const step = ts => {
-      if (!start) start = ts;
-      const p = Math.min((ts - start) / duration, 1);
-      setVal(Math.floor(p * target));
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [target, duration, active]);
-  return val;
-};
-
-/* ═══════════════════════════════════════════════════════
-   COMPONENTE CONTADOR
-═══════════════════════════════════════════════════════ */
-function Counter({ value, suffix, label, active }) {
-  const count = useCountUp(value, 1400, active);
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 'clamp(36px,5vw,58px)', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em', fontFamily: "'Syne', sans-serif" }}>
-        {count}{suffix}
-      </div>
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8, fontWeight: 500, letterSpacing: '0.02em' }}>{label}</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════
+/* ─────────────────────────────────────────────────────
    LANDING
-═══════════════════════════════════════════════════════ */
+───────────────────────────────────────────────────── */
 export default function Landing() {
   const [billing, setBilling]   = useState('monthly');
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [form, setForm]         = useState({ name: '', email: '', message: '' });
   const [sent, setSent]         = useState(false);
-  const [tickerPaused, setTickerPaused] = useState(false);
+  const [ticker, setTicker]     = useState(false);
 
-  const [statsRef, statsInView]   = useInView(0.3);
-  const [featRef,  featInView]    = useInView(0.05);
-  const [pricRef,  pricInView]    = useInView(0.1);
-  const [testRef,  testInView]    = useInView(0.1);
-  const [ctaRef,   ctaInView]     = useInView(0.2);
+  const [heroRef,  heroV]  = useInView(0.2);
+  const [featRef,  featV]  = useInView(0.05);
+  const [stepRef,  stepV]  = useInView(0.1);
+  const [pricRef,  pricV]  = useInView(0.1);
+  const [ctaRef,   ctaV]   = useInView(0.2);
 
   useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 50);
+    const h = () => setScrolled(window.scrollY > 48);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
   }, []);
@@ -136,704 +178,491 @@ export default function Landing() {
     setMenuOpen(false);
   };
 
-  const annual = p => (Number(p) * 0.8).toFixed(2);
-
   const NAV = [
-    { label: 'Funciones',  id: 'funciones' },
-    { label: 'Precios',    id: 'precios' },
-    { label: 'Opiniones',  id: 'opiniones' },
-    { label: 'Contacto',   id: 'contacto' },
+    { label: 'Funciones', id: 'funciones' },
+    { label: 'Cómo funciona', id: 'como' },
+    { label: 'Precios', id: 'precios' },
+    { label: 'Contacto', id: 'contacto' },
   ];
 
-  /* doble ticker para loop infinito */
-  const tickerItems = [...FEATURES, ...FEATURES];
+  const price = (plan) => billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+  const fmt   = v => v === 0 ? 'Gratis' : `${v.toFixed(2).replace('.', ',')}€`;
 
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#060810', color: '#fff', overflowX: 'hidden' }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#F7F8FA', color: '#0D1117', overflowX: 'hidden' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Instrument+Serif:ital@0;1&display=swap');
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
         html { scroll-behavior: smooth; }
         input, textarea, button { font-family: inherit; }
 
-        /* ── Keyframes ── */
-        @keyframes gradShift {
-          0%   { background-position: 0% 50%; }
-          50%  { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes glow {
-          0%,100% { opacity: .6; transform: scale(1); }
-          50%      { opacity: 1;  transform: scale(1.08); }
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(36px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes slideRight {
-          from { transform: translateX(100%); }
-          to   { transform: translateX(0); }
-        }
-        @keyframes ticker {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
-          50%      { box-shadow: 0 0 0 16px rgba(245,158,11,0); }
-        }
-        @keyframes borderRotate {
-          from { --angle: 0deg; }
-          to   { --angle: 360deg; }
-        }
-        @keyframes scanline {
-          from { transform: translateY(-100%); }
-          to   { transform: translateY(100vh); }
+        /* Colores de la marca extraídos del logo */
+        :root {
+          --blue:   #3A5BD9;   /* azul del logo */
+          --teal:   #2AB8A0;   /* teal del logo */
+          --orange: #F5843A;   /* naranja del logo */
+          --dark:   #0D1117;
+          --mid:    #3D4451;
+          --muted:  #6B7280;
+          --border: #E4E7EC;
+          --bg:     #F7F8FA;
+          --white:  #FFFFFF;
         }
 
-        /* ── Utility ── */
-        .fade-up { opacity: 0; transform: translateY(28px); transition: opacity .65s ease, transform .65s ease; }
-        .fade-up.visible { opacity: 1; transform: translateY(0); }
-        .d1 { transition-delay: .05s; } .d2 { transition-delay: .12s; }
-        .d3 { transition-delay: .19s; } .d4 { transition-delay: .26s; }
-        .d5 { transition-delay: .33s; } .d6 { transition-delay: .40s; }
-        .d7 { transition-delay: .47s; } .d8 { transition-delay: .54s; }
-        .d9 { transition-delay: .61s; } .d10 { transition-delay: .68s; }
-        .d11 { transition-delay: .75s; } .d12 { transition-delay: .82s; }
+        @keyframes fadeUp   { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+        @keyframes slideR   { from { transform:translateX(110%); } to { transform:translateX(0); } }
+        @keyframes ticker   { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+        @keyframes shimmer  { 0%,100% { opacity:.5; } 50% { opacity:1; } }
 
-        /* ── Nav ── */
-        .nav-link {
-          font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.55);
-          cursor: pointer; transition: color .2s; text-decoration: none; letter-spacing: .01em;
-        }
-        .nav-link:hover { color: #fff; }
+        .fade-up { opacity:0; transform:translateY(22px); transition:opacity .55s ease, transform .55s ease; }
+        .fade-up.in { opacity:1; transform:translateY(0); }
+        .d1{transition-delay:.04s} .d2{transition-delay:.10s} .d3{transition-delay:.16s}
+        .d4{transition-delay:.22s} .d5{transition-delay:.28s} .d6{transition-delay:.34s}
+        .d7{transition-delay:.40s} .d8{transition-delay:.46s} .d9{transition-delay:.52s}
+        .d10{transition-delay:.58s} .d11{transition-delay:.64s} .d12{transition-delay:.70s}
 
-        /* ── Buttons ── */
-        .btn-cta {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: #F59E0B; color: #000; border: none;
-          padding: 14px 30px; border-radius: 8px;
-          font-size: 15px; font-weight: 700; cursor: pointer;
-          transition: all .2s; text-decoration: none;
-          letter-spacing: -.01em;
-        }
-        .btn-cta:hover { background: #FBBF24; transform: translateY(-2px); box-shadow: 0 12px 40px rgba(245,158,11,.4); }
+        /* Nav */
+        .nl { font-size:14px; font-weight:500; color:var(--muted); cursor:pointer; text-decoration:none; transition:color .18s; letter-spacing:-.01em; }
+        .nl:hover { color:var(--dark); }
 
-        .btn-outline {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: transparent; color: rgba(255,255,255,.75); border: 1px solid rgba(255,255,255,.18);
-          padding: 13px 28px; border-radius: 8px;
-          font-size: 15px; font-weight: 500; cursor: pointer;
-          transition: all .2s; text-decoration: none;
+        /* Buttons */
+        .btn-p {
+          display:inline-flex; align-items:center; gap:7px;
+          background:var(--blue); color:#fff; border:none;
+          padding:13px 26px; border-radius:8px;
+          font-size:14.5px; font-weight:700; cursor:pointer;
+          transition:all .18s; text-decoration:none; letter-spacing:-.01em;
         }
-        .btn-outline:hover { border-color: rgba(255,255,255,.5); color: #fff; background: rgba(255,255,255,.05); }
+        .btn-p:hover { background:#2D49C4; transform:translateY(-1px); box-shadow:0 8px 24px rgba(58,91,217,.28); }
 
-        /* ── Feature ticker ── */
-        .ticker-track {
-          display: flex; gap: 0;
-          animation: ticker 40s linear infinite;
-          width: max-content;
+        .btn-s {
+          display:inline-flex; align-items:center; gap:7px;
+          background:transparent; color:var(--mid); border:1.5px solid var(--border);
+          padding:12px 24px; border-radius:8px;
+          font-size:14.5px; font-weight:600; cursor:pointer;
+          transition:all .18s; text-decoration:none; letter-spacing:-.01em;
         }
-        .ticker-track.paused { animation-play-state: paused; }
-        .ticker-item {
-          display: flex; align-items: center; gap: 12px;
-          padding: 0 32px; border-right: 1px solid rgba(255,255,255,.06);
-          white-space: nowrap; font-size: 14px; font-weight: 500; color: rgba(255,255,255,.5);
-          transition: color .2s;
-          cursor: default;
-        }
-        .ticker-item:hover { color: rgba(255,255,255,.9); }
+        .btn-s:hover { border-color:#9CA3AF; color:var(--dark); }
 
-        /* ── Feature cards ── */
-        .feat-card {
-          background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
-          border-radius: 14px; padding: 26px 24px;
-          transition: all .25s; cursor: default;
-          position: relative; overflow: hidden;
+        /* Feature card */
+        .fc {
+          background:#fff; border:1px solid var(--border); border-radius:12px;
+          padding:24px 22px; transition:all .2s;
         }
-        .feat-card::before {
-          content: ''; position: absolute; inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(59,130,246,.08), transparent 70%);
-          opacity: 0; transition: opacity .3s;
-        }
-        .feat-card:hover { border-color: rgba(59,130,246,.3); transform: translateY(-4px); }
-        .feat-card:hover::before { opacity: 1; }
+        .fc:hover { border-color:#C7D2FE; box-shadow:0 4px 20px rgba(58,91,217,.08); transform:translateY(-3px); }
 
-        /* ── Plan cards ── */
-        .plan-card { transition: transform .25s, box-shadow .25s; }
-        .plan-card:hover { transform: translateY(-6px); }
+        /* Plan card */
+        .pc { border-radius:14px; transition:transform .2s, box-shadow .2s; }
+        .pc:hover { transform:translateY(-4px); }
 
-        /* ── Testimonial cards ── */
-        .test-card {
-          background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
-          border-radius: 16px; padding: 28px 26px;
-          transition: all .22s;
-        }
-        .test-card:hover { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.05); }
+        /* Step */
+        .sc { background:#fff; border:1px solid var(--border); border-radius:12px; padding:28px 26px; }
 
-        /* ── Gradient text ── */
-        .grad-text {
-          background: linear-gradient(90deg, #F59E0B, #F97316);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .grad-text-blue {
-          background: linear-gradient(90deg, #60A5FA, #818CF8);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
+        /* Ticker */
+        .tkr { display:flex; gap:0; animation:ticker 36s linear infinite; width:max-content; }
+        .tkr.p { animation-play-state:paused; }
+        .ti { display:flex; align-items:center; gap:10px; padding:0 28px; border-right:1px solid var(--border); white-space:nowrap; font-size:13.5px; font-weight:500; color:var(--muted); cursor:default; transition:color .18s; }
+        .ti:hover { color:var(--dark); }
 
-        /* ── Noise overlay ── */
-        .noise {
-          position: absolute; inset: 0; pointer-events: none;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-          background-repeat: repeat;
-          background-size: 128px 128px;
-          mix-blend-mode: overlay;
-          opacity: .4;
-          z-index: 0;
-        }
+        /* Form */
+        .fi { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; color:var(--dark); background:#fff; outline:none; transition:border-color .18s; }
+        .fi::placeholder { color:#C4C9D4; }
+        .fi:focus { border-color:var(--blue); }
 
-        /* ── Form inputs ── */
-        .land-input {
-          width: 100%; padding: 12px 16px;
-          background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
-          border-radius: 10px; color: #fff; font-size: 14px;
-          outline: none; transition: border-color .2s, background .2s;
-        }
-        .land-input::placeholder { color: rgba(255,255,255,.25); }
-        .land-input:focus { border-color: rgba(59,130,246,.6); background: rgba(59,130,246,.05); }
+        /* Mobile */
+        .mob-overlay { position:fixed; inset:0; background:rgba(13,17,23,.6); z-index:98; backdrop-filter:blur(6px); animation:fadeIn .2s; }
+        .mob-menu { position:fixed; top:0; right:0; bottom:0; width:min(320px,86vw); background:#fff; z-index:99; padding:72px 28px 36px; display:flex; flex-direction:column; gap:2px; border-left:1px solid var(--border); animation:slideR .26s cubic-bezier(.4,0,.2,1); overflow-y:auto; box-shadow:-12px 0 48px rgba(0,0,0,.1); }
+        .ml { font-size:20px; font-weight:700; color:var(--mid); cursor:pointer; padding:13px 0; border-bottom:1px solid var(--border); transition:color .15s; display:block; text-decoration:none; letter-spacing:-.02em; }
+        .ml:hover { color:var(--dark); }
 
-        /* ── Mobile menu ── */
-        .mob-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 98; backdrop-filter: blur(8px); animation: fadeIn .2s ease; }
-        .mob-menu { position: fixed; top: 0; right: 0; bottom: 0; width: min(340px,88vw); background: #0D1117; z-index: 99; padding: 80px 32px 40px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid rgba(255,255,255,.07); animation: slideRight .28s cubic-bezier(.4,0,.2,1); overflow-y: auto; }
-        .mob-link { font-size: 22px; font-weight: 700; color: rgba(255,255,255,.65); cursor: pointer; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.06); transition: color .15s; display: block; text-decoration: none; font-family: "'Syne', sans-serif"; letter-spacing: -.01em; }
-        .mob-link:hover { color: #fff; }
-
-        /* ── Responsive ── */
-        @media (max-width: 900px) {
-          .feat-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .plan-grid { grid-template-columns: 1fr !important; max-width: 440px !important; margin: 0 auto !important; }
-          .test-grid { grid-template-columns: 1fr 1fr !important; }
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 32px !important; }
-          .footer-grid { grid-template-columns: 1fr 1fr !important; }
+        /* Responsive */
+        @media(max-width:900px) {
+          .fg { grid-template-columns:repeat(2,1fr) !important; }
+          .pg { grid-template-columns:1fr !important; max-width:400px !important; margin:0 auto !important; }
+          .sg { grid-template-columns:repeat(2,1fr) !important; }
+          .ftg { grid-template-columns:1fr 1fr !important; }
         }
-        @media (max-width: 640px) {
-          .feat-grid { grid-template-columns: 1fr !important; }
-          .test-grid { grid-template-columns: 1fr !important; }
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .hero-cta { flex-direction: column !important; }
-          .hero-cta > * { width: 100% !important; justify-content: center !important; text-align: center !important; }
-          .footer-grid { grid-template-columns: 1fr !important; }
-          .footer-bottom { flex-direction: column !important; gap: 16px !important; }
-          .section-pad { padding-left: 20px !important; padding-right: 20px !important; }
-          .hero-pad { padding-left: 24px !important; padding-right: 24px !important; }
+        @media(max-width:600px) {
+          .fg { grid-template-columns:1fr !important; }
+          .sg { grid-template-columns:1fr !important; }
+          .ftg { grid-template-columns:1fr !important; }
+          .hero-cta { flex-direction:column !important; }
+          .hero-cta > * { width:100% !important; justify-content:center !important; }
+          .sp { padding-left:20px !important; padding-right:20px !important; }
         }
-        @media (min-width: 769px) { .mob-ham { display: none !important; } }
-        @media (max-width: 768px) { .nav-desktop-links { display: none !important; } }
+        @media(max-width:768px) { .dsk { display:none !important; } }
+        @media(min-width:769px) { .ham { display:none !important; } }
       `}</style>
 
-      {/* ════════════════════════════════════════
-          NAV
-      ════════════════════════════════════════ */}
+      {/* ══ NAV ══════════════════════════════════════ */}
       <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 64,
-        padding: '0 clamp(20px,5%,72px)',
-        background: scrolled ? 'rgba(6,8,16,.92)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(20px)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,.06)' : 'none',
-        transition: 'all .35s ease',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        position:'fixed', top:0, left:0, right:0, zIndex:100, height:60,
+        padding:'0 clamp(20px,5%,72px)',
+        background: scrolled ? 'rgba(247,248,250,.95)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(16px)' : 'none',
+        borderBottom: scrolled ? '1px solid var(--border)' : 'none',
+        transition:'all .3s',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, fontWeight: 900, color: '#fff', flexShrink: 0,
-            fontFamily: "'Syne', sans-serif",
-          }}>W</div>
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-.01em', fontFamily: "'Syne', sans-serif" }}>Workly</span>
+        <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+          <img src="/logo.png" alt="Workly" style={{ width:32, height:32, borderRadius:7, objectFit:'cover' }} />
+          <span style={{ fontWeight:800, fontSize:16.5, letterSpacing:'-.02em', color:'var(--dark)' }}>Workly</span>
         </div>
 
         {/* Desktop links */}
-        <div className="nav-desktop-links" style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+        <div className="dsk" style={{ display:'flex', gap:28, alignItems:'center' }}>
           {NAV.map(({ label, id }) => (
-            <span key={id} className="nav-link" onClick={() => scrollTo(id)}>{label}</span>
+            <span key={id} className="nl" onClick={() => scrollTo(id)}>{label}</span>
           ))}
         </div>
 
         {/* Desktop CTAs */}
-        <div className="nav-desktop-links" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,.5)', textDecoration: 'none', transition: 'color .2s' }}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,.5)'}>
-            Iniciar sesión
-          </Link>
-          <Link to="/register" className="btn-cta" style={{ padding: '9px 20px', fontSize: 13.5 }}>
+        <div className="dsk" style={{ display:'flex', gap:10, alignItems:'center' }}>
+          <Link to="/login" className="nl" style={{ marginRight:4 }}>Iniciar sesión</Link>
+          <Link to="/register" className="btn-p" style={{ padding:'9px 18px', fontSize:13.5 }}>
             Empieza gratis →
           </Link>
         </div>
 
-        {/* Mobile hamburger */}
-        <button className="mob-ham" onClick={() => setMenuOpen(v => !v)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, display: 'flex', flexDirection: 'column', gap: 5 }}
-          aria-label="Menú">
+        {/* Hamburger */}
+        <button className="ham" onClick={() => setMenuOpen(v => !v)}
+          style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', flexDirection:'column', gap:5 }}>
           {[0,1,2].map(i => (
             <span key={i} style={{
-              display: 'block', width: 22, height: 2, borderRadius: 2, background: '#fff',
-              transition: 'all .22s',
-              transform: menuOpen ? (i===0 ? 'rotate(45deg) translate(5px,5px)' : i===2 ? 'rotate(-45deg) translate(5px,-5px)' : 'scaleX(0)') : 'none',
+              display:'block', width:20, height:2, borderRadius:2, background:'var(--dark)',
+              transition:'all .2s',
+              transform: menuOpen
+                ? (i===0 ? 'rotate(45deg) translate(5px,5px)' : i===2 ? 'rotate(-45deg) translate(5px,-5px)' : 'scaleX(0)')
+                : 'none',
             }} />
           ))}
         </button>
       </nav>
 
-      {/* Mobile menu */}
+      {/* Mobile drawer */}
       {menuOpen && (
         <>
           <div className="mob-overlay" onClick={() => setMenuOpen(false)} />
           <div className="mob-menu">
-            <button onClick={() => setMenuOpen(false)} style={{ position:'absolute', top:18, right:18, background:'rgba(255,255,255,.08)', border:'none', color:'#fff', borderRadius:8, width:36, height:36, cursor:'pointer', fontSize:18 }}>✕</button>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:20, marginBottom:24, color:'#fff' }}>Workly</div>
+            <button onClick={() => setMenuOpen(false)} style={{ position:'absolute', top:16, right:16, background:'#F3F4F6', border:'none', color:'var(--mid)', borderRadius:8, width:34, height:34, cursor:'pointer', fontSize:17, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:28 }}>
+              <img src="/logo.png" alt="Workly" style={{ width:30, height:30, borderRadius:6, objectFit:'cover' }} />
+              <span style={{ fontWeight:800, fontSize:16, letterSpacing:'-.02em' }}>Workly</span>
+            </div>
             {NAV.map(({ label, id }) => (
-              <span key={id} className="mob-link" onClick={() => scrollTo(id)}>{label}</span>
+              <span key={id} className="ml" onClick={() => scrollTo(id)}>{label}</span>
             ))}
-            <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:32 }}>
-              <Link to="/login" onClick={() => setMenuOpen(false)} style={{ textAlign:'center', padding:'13px', border:'1px solid rgba(255,255,255,.15)', borderRadius:10, color:'rgba(255,255,255,.75)', fontWeight:600, fontSize:15, textDecoration:'none' }}>Iniciar sesión</Link>
-              <Link to="/register" onClick={() => setMenuOpen(false)} className="btn-cta" style={{ justifyContent:'center' }}>Empieza gratis →</Link>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:28 }}>
+              <Link to="/login" onClick={() => setMenuOpen(false)} style={{ textAlign:'center', padding:'12px', border:'1.5px solid var(--border)', borderRadius:8, color:'var(--mid)', fontWeight:600, fontSize:14.5, textDecoration:'none' }}>
+                Iniciar sesión
+              </Link>
+              <Link to="/register" onClick={() => setMenuOpen(false)} className="btn-p" style={{ justifyContent:'center' }}>
+                Empieza gratis →
+              </Link>
             </div>
           </div>
         </>
       )}
 
-      {/* ════════════════════════════════════════
-          HERO
-      ════════════════════════════════════════ */}
-      <section id="inicio" style={{ position:'relative', minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', overflow:'hidden', padding:'130px 5% 80px' }}>
-        {/* Mesh gradient bg */}
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59,130,246,.22) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 80%, rgba(139,92,246,.14) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 15% 90%, rgba(245,158,11,.1) 0%, transparent 50%)', zIndex:0 }} />
-        {/* Grid lines */}
-        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px)', backgroundSize:'72px 72px', zIndex:0 }} />
-        <div className="noise" />
+      {/* ══ HERO ═════════════════════════════════════ */}
+      <section id="inicio" style={{ position:'relative', minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'120px clamp(20px,6%,80px) 80px', overflow:'hidden', background:'var(--bg)' }} className="sp">
 
-        <div style={{ position:'relative', zIndex:1, maxWidth:920, margin:'0 auto' }}>
-          {/* Eyebrow */}
-          <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(59,130,246,.12)', border:'1px solid rgba(59,130,246,.25)', borderRadius:99, padding:'6px 16px', fontSize:12.5, color:'rgba(255,255,255,.75)', fontWeight:500, marginBottom:32, backdropFilter:'blur(8px)', letterSpacing:'.03em' }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'#3B82F6', boxShadow:'0 0 8px #3B82F6', flexShrink:0 }} />
-            Plataforma de gestión para freelancers y autónomos
+        {/* Fondo sutil */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 55% at 50% 0%, rgba(58,91,217,.07) 0%, transparent 65%), radial-gradient(ellipse 50% 40% at 85% 80%, rgba(42,184,160,.05) 0%, transparent 55%)', pointerEvents:'none' }} />
+        {/* Dot grid */}
+        <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle, rgba(58,91,217,.12) 1px, transparent 1px)', backgroundSize:'32px 32px', pointerEvents:'none', opacity:.5 }} />
+
+        <div ref={heroRef} style={{ position:'relative', zIndex:1, maxWidth:860, margin:'0 auto' }}>
+          {/* Pill */}
+          <div className={`fade-up${heroV?' in':''}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(58,91,217,.07)', border:'1px solid rgba(58,91,217,.18)', borderRadius:99, padding:'6px 16px', fontSize:12.5, color:'var(--blue)', fontWeight:600, marginBottom:28, letterSpacing:'.01em' }}>
+            <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--teal)', flexShrink:0, animation:'shimmer 2s ease infinite' }} />
+            Gestión integral para freelancers y autónomos
           </div>
 
-          {/* Headline */}
-          <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(40px,6.5vw,86px)', fontWeight:900, lineHeight:1.02, letterSpacing:'-.03em', marginBottom:28, color:'#fff' }}>
-            Tu negocio,<br />
-            <span className="grad-text">sin el caos.</span>
+          {/* H1 */}
+          <h1 className={`fade-up d1${heroV?' in':''}`} style={{ fontSize:'clamp(36px,5.5vw,72px)', fontWeight:800, lineHeight:1.06, letterSpacing:'-.03em', color:'var(--dark)', marginBottom:22 }}>
+            Centraliza tu negocio.<br />
+            <span style={{ fontFamily:"'Instrument Serif', serif", fontStyle:'italic', fontWeight:400, color:'var(--blue)' }}>
+              Factúra sin fricciones.
+            </span>
           </h1>
 
-          <p style={{ fontSize:'clamp(16px,2vw,19px)', color:'rgba(255,255,255,.55)', maxWidth:560, margin:'0 auto 44px', lineHeight:1.72 }}>
-            Clientes, proyectos, facturas, gastos y contabilidad en una sola herramienta. Diseñada para que trabajes, no para que gestiones.
+          <p className={`fade-up d2${heroV?' in':''}`} style={{ fontSize:'clamp(16px,2vw,18.5px)', color:'var(--muted)', maxWidth:560, margin:'0 auto 40px', lineHeight:1.72 }}>
+            Clientes, proyectos, facturas PDF, gastos, horas y contabilidad en una sola herramienta. Sin hojas de cálculo, sin herramientas dispersas.
           </p>
 
-          {/* CTA row */}
-          <div className="hero-cta" style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap', marginBottom:72 }}>
-            <Link to="/register" className="btn-cta" style={{ fontSize:16, padding:'15px 34px' }}>
-              Empieza gratis — es 0€ →
+          <div className={`hero-cta fade-up d3${heroV?' in':''}`} style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginBottom:52 }}>
+            <Link to="/register" className="btn-p" style={{ fontSize:15.5, padding:'14px 30px' }}>
+              Empieza gratis — plan Free disponible →
             </Link>
-            <button className="btn-outline" onClick={() => scrollTo('funciones')}>
+            <button className="btn-s" onClick={() => scrollTo('funciones')}>
               Ver todas las funciones
             </button>
           </div>
 
-          {/* Social proof bar */}
-          <div style={{ display:'inline-flex', alignItems:'center', gap:0, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)', borderRadius:12, padding:'12px 24px', backdropFilter:'blur(8px)' }}>
-            <div style={{ display:'flex', marginRight:12 }}>
-              {['#3B82F6','#F59E0B','#10B981','#8B5CF6'].map((c,i) => (
-                <div key={i} style={{ width:30, height:30, borderRadius:'50%', background:c, border:'2px solid #060810', marginLeft: i ? -10 : 0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>
-                  {['C','L','D','A'][i]}
-                </div>
-              ))}
-            </div>
-            <div style={{ textAlign:'left' }}>
-              <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>Freelancers que ya lo usan</div>
-              <div style={{ fontSize:11.5, color:'rgba(255,255,255,.4)', marginTop:1 }}>
-                {'★★★★★'} <span style={{ marginLeft:4 }}>Valoración media 4.9</span>
-              </div>
-            </div>
+          {/* Stack pill */}
+          <div className={`fade-up d4${heroV?' in':''}`} style={{ display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center' }}>
+            {TECH.map(t => (
+              <span key={t} style={{ fontSize:12, fontWeight:500, color:'var(--muted)', background:'#fff', border:'1px solid var(--border)', borderRadius:6, padding:'4px 10px', letterSpacing:'.01em' }}>{t}</span>
+            ))}
           </div>
         </div>
 
-        {/* Bottom scroll hint */}
-        <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', display:'flex', flexDirection:'column', alignItems:'center', gap:6, opacity:.3, cursor:'pointer' }} onClick={() => scrollTo('funciones')}>
-          <div style={{ width:24, height:38, border:'1.5px solid rgba(255,255,255,.5)', borderRadius:99, display:'flex', justifyContent:'center', paddingTop:7 }}>
-            <div style={{ width:3, height:9, borderRadius:99, background:'#fff', animation:'glow 1.6s ease-in-out infinite' }} />
+        {/* Scroll */}
+        <div style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', display:'flex', flexDirection:'column', alignItems:'center', gap:5, opacity:.3, cursor:'pointer' }} onClick={() => scrollTo('funciones')}>
+          <div style={{ width:20, height:32, border:'1.5px solid var(--mid)', borderRadius:99, display:'flex', justifyContent:'center', paddingTop:5 }}>
+            <div style={{ width:3, height:8, borderRadius:99, background:'var(--mid)', animation:'shimmer 1.5s ease-in-out infinite' }} />
           </div>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          TICKER DE FEATURES
-      ════════════════════════════════════════ */}
-      <div style={{ borderTop:'1px solid rgba(255,255,255,.06)', borderBottom:'1px solid rgba(255,255,255,.06)', overflow:'hidden', padding:'18px 0', position:'relative' }}
-        onMouseEnter={() => setTickerPaused(true)} onMouseLeave={() => setTickerPaused(false)}>
-        {/* Fade masks */}
-        <div style={{ position:'absolute', left:0, top:0, bottom:0, width:120, background:'linear-gradient(to right, #060810, transparent)', zIndex:1, pointerEvents:'none' }} />
-        <div style={{ position:'absolute', right:0, top:0, bottom:0, width:120, background:'linear-gradient(to left, #060810, transparent)', zIndex:1, pointerEvents:'none' }} />
-
-        <div className={`ticker-track${tickerPaused ? ' paused' : ''}`}>
-          {tickerItems.map((f, i) => (
-            <div key={i} className="ticker-item">
-              <span style={{ fontSize:18 }}>{f.icon}</span>
-              <span style={{ fontWeight:600, color:'rgba(255,255,255,.7)' }}>{f.label}</span>
+      {/* ══ TICKER ═══════════════════════════════════ */}
+      <div style={{ borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'#fff', overflow:'hidden', padding:'16px 0', position:'relative' }}
+        onMouseEnter={() => setTicker(true)} onMouseLeave={() => setTicker(false)}>
+        <div style={{ position:'absolute', left:0, top:0, bottom:0, width:80, background:'linear-gradient(to right,#fff,transparent)', zIndex:1, pointerEvents:'none' }} />
+        <div style={{ position:'absolute', right:0, top:0, bottom:0, width:80, background:'linear-gradient(to left,#fff,transparent)', zIndex:1, pointerEvents:'none' }} />
+        <div className={`tkr${ticker?' p':''}`}>
+          {[...FEATURES, ...FEATURES].map((f, i) => (
+            <div key={i} className="ti">
+              <span style={{ fontSize:16 }}>{f.icon}</span>
+              <span>{f.title}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ════════════════════════════════════════
-          STATS
-      ════════════════════════════════════════ */}
-      <section ref={statsRef} style={{ padding:'clamp(60px,8vw,100px) clamp(20px,6%,80px)', position:'relative' }}>
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 50% at 50% 50%, rgba(59,130,246,.06), transparent 70%)', pointerEvents:'none' }} />
-        <div style={{ maxWidth:960, margin:'0 auto', position:'relative' }}>
-          <div className="stats-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:48, justifyItems:'center' }}>
-            {STATS.map((s, i) => (
-              <Counter key={i} value={s.value} suffix={s.suffix} label={s.label} active={statsInView} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════
-          FUNCIONES
-      ════════════════════════════════════════ */}
-      <section id="funciones" style={{ padding:'clamp(60px,8vw,110px) clamp(20px,6%,80px)', position:'relative' }} className="section-pad">
+      {/* ══ FUNCIONES ════════════════════════════════ */}
+      <section id="funciones" style={{ padding:'clamp(64px,8vw,108px) clamp(20px,6%,80px)', background:'var(--bg)' }} className="sp">
         <div style={{ maxWidth:1160, margin:'0 auto' }}>
-
-          {/* Section header */}
-          <div ref={featRef} style={{ marginBottom:'clamp(40px,5vw,72px)' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:8, color:'rgba(255,255,255,.4)', fontSize:12, fontWeight:600, letterSpacing:'.12em', textTransform:'uppercase', marginBottom:16 }}>
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
+          <div ref={featRef} style={{ marginBottom:'clamp(40px,5vw,68px)' }}>
+            <p style={{ fontSize:12.5, fontWeight:700, color:'var(--blue)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12 }}>
               Funciones
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-            </div>
-            <h2 className={`fade-up${featInView?' visible':''}`} style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(30px,4.5vw,58px)', fontWeight:900, lineHeight:1.08, letterSpacing:'-.03em', marginBottom:20 }}>
-              Todo en uno.<br /><span className="grad-text-blue">Sin compromisos.</span>
+            </p>
+            <h2 className={`fade-up${featV?' in':''}`} style={{ fontSize:'clamp(28px,4vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.03em', maxWidth:580 }}>
+              Todo lo que necesitas,<br />
+              <span style={{ fontFamily:"'Instrument Serif',serif", fontStyle:'italic', fontWeight:400, color:'var(--blue)' }}>integrado desde el día uno.</span>
             </h2>
-            <p className={`fade-up d1${featInView?' visible':''}`} style={{ fontSize:17, color:'rgba(255,255,255,.45)', maxWidth:500, lineHeight:1.72 }}>
-              12 módulos integrados desde el primer día. Sin integraciones de terceros, sin coste extra, sin complicaciones.
+            <p className={`fade-up d1${featV?' in':''}`} style={{ fontSize:16.5, color:'var(--muted)', marginTop:16, maxWidth:480, lineHeight:1.7 }}>
+              12 módulos construidos sobre Node.js, React 19 y MySQL. Sin dependencias de terceros innecesarias.
             </p>
           </div>
 
-          {/* Feature grid */}
-          <div className="feat-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+          <div className="fg" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
             {FEATURES.map((f, i) => (
-              <div key={f.label}
-                className={`feat-card fade-up d${(i%6)+1}${featInView?' visible':''}`}>
-                <div style={{ fontSize:28, marginBottom:14 }}>{f.icon}</div>
-                <div style={{ fontSize:15, fontWeight:700, marginBottom:8, color:'#fff', letterSpacing:'-.01em', fontFamily:"'Syne',sans-serif" }}>{f.label}</div>
-                <p style={{ fontSize:13.5, color:'rgba(255,255,255,.4)', lineHeight:1.65 }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* CTA bajo features */}
-          <div style={{ textAlign:'center', marginTop:52 }}>
-            <Link to="/register" className="btn-cta" style={{ fontSize:15, padding:'13px 28px' }}>
-              Probar todas las funciones gratis →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════
-          BENTO / HIGHLIGHT SECTION
-      ════════════════════════════════════════ */}
-      <section style={{ padding:'0 clamp(20px,6%,80px) clamp(60px,8vw,100px)' }} className="section-pad">
-        <div style={{ maxWidth:1160, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-
-          {/* Card grande izquierda */}
-          <div style={{ background:'linear-gradient(145deg, rgba(59,130,246,.12), rgba(59,130,246,.04))', border:'1px solid rgba(59,130,246,.2)', borderRadius:20, padding:'40px 36px', display:'flex', flexDirection:'column', justifyContent:'space-between', minHeight:320, position:'relative', overflow:'hidden', gridRow:'span 2' }}>
-            <div style={{ position:'absolute', top:-60, right:-60, width:220, height:220, borderRadius:'50%', background:'rgba(59,130,246,.1)', filter:'blur(40px)', pointerEvents:'none' }} />
-            <div>
-              <div style={{ fontSize:13, fontWeight:600, color:'#3B82F6', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:16 }}>Facturación inteligente</div>
-              <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(22px,3vw,34px)', fontWeight:900, lineHeight:1.1, letterSpacing:'-.02em', marginBottom:16 }}>
-                De presupuesto<br />a factura pagada<br />en tres clics.
-              </h3>
-              <p style={{ fontSize:15, color:'rgba(255,255,255,.5)', lineHeight:1.7 }}>
-                Crea presupuestos, conviértelos en facturas, envíalas por email con PDF adjunto y registra los cobros. Todo desde la misma pantalla.
-              </p>
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:32 }}>
-              {['Número correlativo automático', 'IVA, descuentos y retenciones', 'Portal público para el cliente', 'Firma de facturas electrónica'].map(t => (
-                <div key={t} style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:'rgba(255,255,255,.65)' }}>
-                  <span style={{ color:'#3B82F6', fontWeight:700 }}>✓</span> {t}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Card IA */}
-          <div style={{ background:'linear-gradient(145deg, rgba(245,158,11,.1), rgba(249,115,22,.06))', border:'1px solid rgba(245,158,11,.2)', borderRadius:20, padding:'32px 30px', position:'relative', overflow:'hidden', minHeight:150 }}>
-            <div style={{ position:'absolute', top:-40, right:-40, width:160, height:160, borderRadius:'50%', background:'rgba(245,158,11,.1)', filter:'blur(30px)', pointerEvents:'none' }} />
-            <div style={{ fontSize:13, fontWeight:600, color:'#F59E0B', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>Asistente IA</div>
-            <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(18px,2.5vw,26px)', fontWeight:900, lineHeight:1.15, letterSpacing:'-.02em', marginBottom:10 }}>
-              Presupuestos<br />que se escriben solos.
-            </h3>
-            <p style={{ fontSize:13.5, color:'rgba(255,255,255,.45)', lineHeight:1.65 }}>Describe el proyecto y la IA genera el presupuesto completo con líneas, importes y condiciones.</p>
-          </div>
-
-          {/* Card Dashboard */}
-          <div style={{ background:'linear-gradient(145deg, rgba(16,185,129,.1), rgba(16,185,129,.04))', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'32px 30px', position:'relative', overflow:'hidden', minHeight:150 }}>
-            <div style={{ position:'absolute', top:-40, right:-40, width:160, height:160, borderRadius:'50%', background:'rgba(16,185,129,.1)', filter:'blur(30px)', pointerEvents:'none' }} />
-            <div style={{ fontSize:13, fontWeight:600, color:'#10B981', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:12 }}>Dashboard financiero</div>
-            <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(18px,2.5vw,26px)', fontWeight:900, lineHeight:1.15, letterSpacing:'-.02em', marginBottom:10 }}>
-              Sabe lo que ganas<br />antes de preguntar.
-            </h3>
-            <p style={{ fontSize:13.5, color:'rgba(255,255,255,.45)', lineHeight:1.65 }}>Ingresos, gastos, beneficio neto y alertas de facturas vencidas. En tiempo real, siempre visible.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════
-          TESTIMONIOS
-      ════════════════════════════════════════ */}
-      <section id="opiniones" style={{ padding:'clamp(60px,8vw,110px) clamp(20px,6%,80px)', position:'relative', background:'rgba(255,255,255,.015)' }} className="section-pad">
-        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px)', backgroundSize:'48px 48px', pointerEvents:'none' }} />
-
-        <div style={{ maxWidth:1100, margin:'0 auto', position:'relative' }}>
-          <div ref={testRef} style={{ textAlign:'center', marginBottom:'clamp(36px,5vw,64px)' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:8, color:'rgba(255,255,255,.4)', fontSize:12, fontWeight:600, letterSpacing:'.12em', textTransform:'uppercase', marginBottom:16 }}>
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-              Opiniones
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-            </div>
-            <h2 className={`fade-up${testInView?' visible':''}`} style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(28px,4vw,54px)', fontWeight:900, lineHeight:1.08, letterSpacing:'-.03em' }}>
-              Lo que dicen<br /><span className="grad-text">quienes lo usan.</span>
-            </h2>
-          </div>
-
-          <div className="test-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
-            {TESTIMONIALS.map((t, i) => (
-              <div key={t.name} className={`test-card fade-up d${i+1}${testInView?' visible':''}`}>
-                <div style={{ color:'#F59E0B', fontSize:13, marginBottom:14, letterSpacing:2 }}>{'★'.repeat(t.stars)}</div>
-                <p style={{ fontSize:14, color:'rgba(255,255,255,.6)', lineHeight:1.75, marginBottom:20, fontStyle:'italic' }}>"{t.text}"</p>
-                <div style={{ display:'flex', alignItems:'center', gap:10, borderTop:'1px solid rgba(255,255,255,.06)', paddingTop:16 }}>
-                  <div style={{ width:36, height:36, borderRadius:10, background:`${t.color}22`, color:t.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, flexShrink:0, border:`1px solid ${t.color}33` }}>
-                    {t.initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{t.name}</div>
-                    <div style={{ fontSize:11.5, color:'rgba(255,255,255,.3)' }}>{t.role}</div>
-                  </div>
-                </div>
+              <div key={f.title} className={`fc fade-up d${(i%6)+1}${featV?' in':''}`}>
+                <div style={{ fontSize:26, marginBottom:12 }}>{f.icon}</div>
+                <h3 style={{ fontSize:14.5, fontWeight:700, color:'var(--dark)', marginBottom:8, letterSpacing:'-.01em' }}>{f.title}</h3>
+                <p style={{ fontSize:13.5, color:'var(--muted)', lineHeight:1.65 }}>{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          PRECIOS
-      ════════════════════════════════════════ */}
-      <section id="precios" style={{ padding:'clamp(60px,8vw,110px) clamp(20px,6%,80px)' }} className="section-pad">
+      {/* ══ CÓMO FUNCIONA ════════════════════════════ */}
+      <section id="como" style={{ padding:'clamp(64px,8vw,108px) clamp(20px,6%,80px)', background:'#fff', borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)' }} className="sp">
         <div style={{ maxWidth:1040, margin:'0 auto' }}>
-
-          <div ref={pricRef} style={{ textAlign:'center', marginBottom:'clamp(36px,5vw,60px)' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:8, color:'rgba(255,255,255,.4)', fontSize:12, fontWeight:600, letterSpacing:'.12em', textTransform:'uppercase', marginBottom:16 }}>
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-              Precios
-              <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-            </div>
-            <h2 className={`fade-up${pricInView?' visible':''}`} style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(28px,4vw,54px)', fontWeight:900, lineHeight:1.08, letterSpacing:'-.03em', marginBottom:14 }}>
-              Sin sorpresas.<br /><span className="grad-text-blue">Sin letra pequeña.</span>
+          <div ref={stepRef} style={{ textAlign:'center', marginBottom:'clamp(40px,5vw,64px)' }}>
+            <p style={{ fontSize:12.5, fontWeight:700, color:'var(--teal)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12 }}>Cómo funciona</p>
+            <h2 className={`fade-up${stepV?' in':''}`} style={{ fontSize:'clamp(26px,4vw,48px)', fontWeight:800, lineHeight:1.12, letterSpacing:'-.03em' }}>
+              De cero a productivo<br />
+              <span style={{ fontFamily:"'Instrument Serif',serif", fontStyle:'italic', fontWeight:400, color:'var(--teal)' }}>en 5 minutos.</span>
             </h2>
-            <p style={{ fontSize:16, color:'rgba(255,255,255,.4)', lineHeight:1.6 }}>Cancela cuando quieras. Sin permanencia.</p>
+          </div>
 
-            {/* Toggle billing */}
-            <div style={{ display:'inline-flex', background:'rgba(255,255,255,.06)', borderRadius:99, padding:4, marginTop:24, gap:2, border:'1px solid rgba(255,255,255,.08)' }}>
+          <div className="sg" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
+            {STEPS.map((s, i) => (
+              <div key={s.n} className={`sc fade-up d${i+1}${stepV?' in':''}`}>
+                <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:42, fontWeight:400, color:'var(--blue)', opacity:.18, lineHeight:1, marginBottom:16, letterSpacing:'-.02em' }}>{s.n}</div>
+                <h3 style={{ fontSize:15, fontWeight:700, marginBottom:10, letterSpacing:'-.01em' }}>{s.title}</h3>
+                <p style={{ fontSize:13.5, color:'var(--muted)', lineHeight:1.65 }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ PRECIOS ══════════════════════════════════ */}
+      <section id="precios" style={{ padding:'clamp(64px,8vw,108px) clamp(20px,6%,80px)', background:'var(--bg)' }} className="sp">
+        <div style={{ maxWidth:1020, margin:'0 auto' }}>
+          <div ref={pricRef} style={{ textAlign:'center', marginBottom:'clamp(36px,5vw,56px)' }}>
+            <p style={{ fontSize:12.5, fontWeight:700, color:'var(--orange)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12 }}>Precios</p>
+            <h2 className={`fade-up${pricV?' in':''}`} style={{ fontSize:'clamp(26px,4vw,48px)', fontWeight:800, lineHeight:1.12, letterSpacing:'-.03em', marginBottom:12 }}>
+              Transparencia total.<br />
+              <span style={{ fontFamily:"'Instrument Serif',serif", fontStyle:'italic', fontWeight:400, color:'var(--orange)' }}>Sin letra pequeña.</span>
+            </h2>
+            <p style={{ fontSize:16, color:'var(--muted)', lineHeight:1.6 }}>Cancela cuando quieras. Plan Free para siempre disponible.</p>
+
+            {/* Toggle */}
+            <div style={{ display:'inline-flex', background:'#fff', border:'1px solid var(--border)', borderRadius:99, padding:4, marginTop:24, gap:2 }}>
               {['monthly','yearly'].map(b => (
                 <button key={b} onClick={() => setBilling(b)} style={{
                   padding:'8px 20px', borderRadius:99, border:'none', cursor:'pointer',
                   fontFamily:'inherit', fontSize:13.5, fontWeight:600,
-                  background: billing===b ? '#fff' : 'transparent',
-                  color: billing===b ? '#060810' : 'rgba(255,255,255,.45)',
-                  boxShadow: billing===b ? '0 1px 4px rgba(0,0,0,.3)' : 'none',
+                  background: billing===b ? 'var(--dark)' : 'transparent',
+                  color: billing===b ? '#fff' : 'var(--muted)',
                   transition:'all .2s',
                 }}>
-                  {b==='monthly' ? 'Mensual' : <span>Anual <span style={{ marginLeft:5, fontSize:10.5, background:'rgba(16,185,129,.2)', color:'#10B981', padding:'2px 8px', borderRadius:99, fontWeight:700 }}>-20%</span></span>}
+                  {b==='monthly' ? 'Mensual' : (
+                    <span>Anual <span style={{ fontSize:11, background:'rgba(42,184,160,.15)', color:'var(--teal)', padding:'2px 7px', borderRadius:99, fontWeight:700, marginLeft:4 }}>-20%</span></span>
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="plan-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, alignItems:'start' }}>
+          <div className="pg" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:18, alignItems:'start' }}>
             {PLANS.map((plan, i) => (
-              <div key={plan.name}
-                className={`plan-card fade-up d${i+1}${pricInView?' visible':''}`}
+              <div key={plan.id}
+                className={`pc fade-up d${i+1}${pricV?' in':''}`}
                 style={{
-                  background: plan.popular ? 'linear-gradient(145deg,#1D4ED8,#2563EB)' : 'rgba(255,255,255,.04)',
-                  border: plan.popular ? 'none' : '1px solid rgba(255,255,255,.08)',
-                  borderRadius:20, padding:'36px 30px',
-                  boxShadow: plan.popular ? '0 0 0 1px rgba(59,130,246,.4), 0 32px 80px rgba(29,78,216,.4)' : 'none',
+                  background: plan.highlight ? 'var(--blue)' : '#fff',
+                  border: plan.highlight ? 'none' : '1px solid var(--border)',
+                  boxShadow: plan.highlight ? '0 20px 60px rgba(58,91,217,.3)' : '0 1px 4px rgba(0,0,0,.04)',
+                  padding:'32px 28px',
                   position:'relative', overflow:'hidden',
                 }}>
 
-                {plan.popular && (
-                  <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'linear-gradient(90deg, #60A5FA, #818CF8, #60A5FA)', backgroundSize:'200% 100%', animation:'gradShift 3s ease infinite' }} />
-                )}
-                {plan.badge && (
-                  <div style={{ display:'inline-block', fontSize:11, fontWeight:700, color: plan.popular ? '#fff' : '#10B981', background: plan.popular ? 'rgba(255,255,255,.15)' : 'rgba(16,185,129,.15)', padding:'4px 12px', borderRadius:99, marginBottom:18, letterSpacing:'.06em', textTransform:'uppercase' }}>
-                    {plan.badge}
-                  </div>
+                {/* Accent top bar para highlight */}
+                {plan.highlight && (
+                  <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,var(--teal),var(--orange))' }} />
                 )}
 
-                <div style={{ fontSize:13, fontWeight:600, color: plan.popular ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.35)', marginBottom:8, textTransform:'uppercase', letterSpacing:'.06em' }}>
-                  {plan.name}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color: plan.highlight ? 'rgba(255,255,255,.6)' : 'var(--muted)', letterSpacing:'.04em', textTransform:'uppercase' }}>
+                    {plan.name}
+                  </div>
+                  {plan.highlight && (
+                    <span style={{ fontSize:11, fontWeight:700, background:'rgba(255,255,255,.15)', color:'#fff', padding:'3px 10px', borderRadius:99, letterSpacing:'.04em' }}>
+                      Más popular
+                    </span>
+                  )}
                 </div>
 
-                {plan.price ? (
-                  <div style={{ marginBottom:28 }}>
-                    <span style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(38px,5vw,52px)', fontWeight:900, lineHeight:1, letterSpacing:'-.03em', color:'#fff' }}>
-                      {billing==='yearly' ? annual(plan.price) : plan.price}€
+                <div style={{ marginBottom:24 }}>
+                  <div style={{ display:'flex', alignItems:'baseline', gap:4 }}>
+                    <span style={{ fontSize:'clamp(36px,5vw,50px)', fontWeight:800, color: plan.highlight ? '#fff' : 'var(--dark)', lineHeight:1, letterSpacing:'-.03em' }}>
+                      {price(plan) === 0 ? '0€' : `${price(plan).toFixed(2).replace('.',',')}€`}
                     </span>
-                    <span style={{ fontSize:14, color: plan.popular ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.3)', marginLeft:6 }}>/mes</span>
-                    {billing==='yearly' && <div style={{ fontSize:12, color: plan.popular ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.25)', marginTop:4 }}>Facturado anualmente</div>}
+                    {price(plan) > 0 && <span style={{ fontSize:14, color: plan.highlight ? 'rgba(255,255,255,.5)' : 'var(--muted)', fontWeight:400 }}>/mes</span>}
                   </div>
-                ) : (
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(30px,4vw,42px)', fontWeight:900, color:'#fff', marginBottom:28, lineHeight:1, letterSpacing:'-.02em' }}>
-                    A medida
-                  </div>
-                )}
+                  {billing==='yearly' && plan.monthlyPrice > 0 && (
+                    <div style={{ fontSize:12, color: plan.highlight ? 'rgba(255,255,255,.4)' : 'var(--muted)', marginTop:4 }}>
+                      Facturado anualmente · {fmt(plan.yearlyPrice * 12)}/año
+                    </div>
+                  )}
+                </div>
 
-                <div style={{ height:1, background:'rgba(255,255,255,.1)', marginBottom:24 }} />
+                <div style={{ height:1, background: plan.highlight ? 'rgba(255,255,255,.12)' : 'var(--border)', marginBottom:22 }} />
 
-                <ul style={{ listStyle:'none', display:'flex', flexDirection:'column', gap:10, marginBottom:32 }}>
+                <ul style={{ listStyle:'none', display:'flex', flexDirection:'column', gap:9, marginBottom:28 }}>
                   {plan.features.map(f => (
-                    <li key={f} style={{ display:'flex', alignItems:'flex-start', gap:9, fontSize:14, color: plan.popular ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.55)' }}>
-                      <span style={{ color: plan.popular ? '#93C5FD' : plan.color, flexShrink:0, fontWeight:700, marginTop:.5 }}>✓</span>
+                    <li key={f} style={{ display:'flex', alignItems:'flex-start', gap:9, fontSize:13.5, color: plan.highlight ? 'rgba(255,255,255,.87)' : 'var(--mid)' }}>
+                      <span style={{ color: plan.highlight ? 'rgba(255,255,255,.7)' : 'var(--teal)', fontWeight:700, flexShrink:0, marginTop:.5 }}>✓</span>
+                      {f}
+                    </li>
+                  ))}
+                  {plan.missing.map(f => (
+                    <li key={f} style={{ display:'flex', alignItems:'flex-start', gap:9, fontSize:13.5, color: plan.highlight ? 'rgba(255,255,255,.3)' : '#C4C9D4' }}>
+                      <span style={{ fontWeight:700, flexShrink:0, marginTop:.5 }}>—</span>
                       {f}
                     </li>
                   ))}
                 </ul>
 
-                <Link to={plan.price ? '/register' : '#contacto'}
-                  onClick={!plan.price ? () => scrollTo('contacto') : undefined}
+                <Link to={plan.ctaHref}
+                  onClick={plan.ctaHref==='#contacto' ? e => { e.preventDefault(); scrollTo('contacto'); } : undefined}
                   style={{
                     display:'block', textAlign:'center', textDecoration:'none',
-                    padding:'13px 20px', borderRadius:10,
-                    fontWeight:700, fontSize:14.5, fontFamily:'inherit',
-                    background: plan.popular ? '#fff' : 'rgba(255,255,255,.08)',
-                    color: plan.popular ? '#1D4ED8' : '#fff',
-                    border: plan.popular ? 'none' : '1px solid rgba(255,255,255,.12)',
-                    transition:'all .2s',
+                    padding:'12px 20px', borderRadius:8,
+                    fontWeight:700, fontSize:14, fontFamily:'inherit',
+                    background: plan.highlight ? '#fff' : 'var(--dark)',
+                    color: plan.highlight ? 'var(--blue)' : '#fff',
+                    transition:'all .18s',
                   }}
-                  onMouseEnter={e => { if (!plan.popular) { e.currentTarget.style.background='rgba(255,255,255,.14)'; } }}
-                  onMouseLeave={e => { if (!plan.popular) { e.currentTarget.style.background='rgba(255,255,255,.08)'; } }}>
-                  {plan.price ? (plan.popular ? 'Prueba gratis 7 días' : 'Empezar ahora') : 'Hablar con ventas'}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                  {plan.cta}
                 </Link>
               </div>
             ))}
           </div>
 
-          {/* Garantía */}
-          <div style={{ textAlign:'center', marginTop:40, fontSize:14, color:'rgba(255,255,255,.3)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-            <span style={{ fontSize:18 }}>🔒</span>
-            Sin tarjeta de crédito · Cancela cuando quieras · Datos 100% tuyos
-          </div>
+          <p style={{ textAlign:'center', marginTop:32, fontSize:13.5, color:'var(--muted)' }}>
+            🔒 Sin tarjeta de crédito para el plan Free · Pagos seguros con Stripe · Cancela cuando quieras
+          </p>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          CTA FINAL
-      ════════════════════════════════════════ */}
-      <section ref={ctaRef} style={{ padding:'clamp(40px,6vw,80px) clamp(20px,6%,80px)' }} className="section-pad">
-        <div className={`fade-up${ctaInView?' visible':''}`} style={{ maxWidth:860, margin:'0 auto', position:'relative' }}>
-          <div style={{
-            borderRadius:24, padding:'clamp(44px,7vw,80px) clamp(28px,5vw,72px)',
-            background:'linear-gradient(145deg, rgba(59,130,246,.15), rgba(139,92,246,.1))',
-            border:'1px solid rgba(59,130,246,.2)', textAlign:'center',
-            position:'relative', overflow:'hidden',
-          }}>
-            {/* Glow orbs */}
-            <div style={{ position:'absolute', top:-80, right:-80, width:300, height:300, borderRadius:'50%', background:'rgba(59,130,246,.15)', filter:'blur(60px)', pointerEvents:'none' }} />
-            <div style={{ position:'absolute', bottom:-60, left:-60, width:240, height:240, borderRadius:'50%', background:'rgba(245,158,11,.1)', filter:'blur(50px)', pointerEvents:'none' }} />
-            <div className="noise" />
-
-            <div style={{ position:'relative', zIndex:1 }}>
-              <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(26px,4vw,52px)', fontWeight:900, lineHeight:1.1, letterSpacing:'-.03em', marginBottom:16 }}>
-                Empieza hoy.<br />
-                <span className="grad-text">Gratis. Sin excusas.</span>
-              </h2>
-              <p style={{ fontSize:'clamp(15px,2vw,18px)', color:'rgba(255,255,255,.5)', marginBottom:40, lineHeight:1.7, maxWidth:500, margin:'0 auto 40px' }}>
-                Configura tu cuenta en menos de 2 minutos. Sin tarjeta de crédito, sin permanencia, sin límites de prueba.
-              </p>
-              <div style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap' }}>
-                <Link to="/register" className="btn-cta" style={{ fontSize:16, padding:'16px 36px', animation:'pulse 2.5s ease infinite' }}>
-                  Crear cuenta gratis →
-                </Link>
-                <Link to="/login" className="btn-outline" style={{ fontSize:15 }}>
-                  Ya tengo cuenta
-                </Link>
-              </div>
-            </div>
+      {/* ══ CTA ══════════════════════════════════════ */}
+      <section ref={ctaRef} style={{ padding:'clamp(48px,7vw,88px) clamp(20px,6%,80px)', background:'#fff', borderTop:'1px solid var(--border)' }} className="sp">
+        <div className={`fade-up${ctaV?' in':''}`} style={{ maxWidth:740, margin:'0 auto', textAlign:'center' }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:8, marginBottom:24 }}>
+            <img src="/logo.png" alt="Workly" style={{ width:40, height:40, borderRadius:10, objectFit:'cover' }} />
+            <span style={{ fontWeight:800, fontSize:18, letterSpacing:'-.02em' }}>Workly</span>
           </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════
-          CONTACTO
-      ════════════════════════════════════════ */}
-      <section id="contacto" style={{ padding:'clamp(60px,8vw,100px) clamp(20px,6%,80px)', background:'rgba(255,255,255,.015)' }} className="section-pad">
-        <div style={{ maxWidth:560, margin:'0 auto', textAlign:'center' }}>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:8, color:'rgba(255,255,255,.4)', fontSize:12, fontWeight:600, letterSpacing:'.12em', textTransform:'uppercase', marginBottom:16 }}>
-            <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-            Contacto
-            <div style={{ width:24, height:1, background:'rgba(255,255,255,.2)' }} />
-          </div>
-          <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(26px,4vw,46px)', fontWeight:900, lineHeight:1.1, letterSpacing:'-.02em', marginBottom:12 }}>
-            ¿Alguna duda?
+          <h2 style={{ fontSize:'clamp(24px,4vw,48px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.03em', marginBottom:16 }}>
+            Empieza hoy con el plan Free.<br />
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontStyle:'italic', fontWeight:400, color:'var(--blue)' }}>
+              Sin compromiso, para siempre.
+            </span>
           </h2>
-          <p style={{ fontSize:16, color:'rgba(255,255,255,.4)', marginBottom:44, lineHeight:1.7 }}>
+          <p style={{ fontSize:'clamp(15px,2vw,17.5px)', color:'var(--muted)', marginBottom:36, lineHeight:1.72, maxWidth:480, margin:'0 auto 36px' }}>
+            5 clientes, 3 proyectos y 10 facturas/mes sin coste. Actualiza a Pro cuando lo necesites.
+          </p>
+          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+            <Link to="/register" className="btn-p" style={{ fontSize:15.5, padding:'14px 30px' }}>
+              Crear cuenta gratis →
+            </Link>
+            <Link to="/login" className="btn-s">Ya tengo cuenta</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ CONTACTO ═════════════════════════════════ */}
+      <section id="contacto" style={{ padding:'clamp(64px,8vw,100px) clamp(20px,6%,80px)', background:'var(--bg)', borderTop:'1px solid var(--border)' }} className="sp">
+        <div style={{ maxWidth:520, margin:'0 auto' }}>
+          <p style={{ fontSize:12.5, fontWeight:700, color:'var(--blue)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12, textAlign:'center' }}>Contacto</p>
+          <h2 style={{ fontSize:'clamp(24px,4vw,40px)', fontWeight:800, lineHeight:1.12, letterSpacing:'-.03em', marginBottom:10, textAlign:'center' }}>
+            ¿Tienes alguna duda?
+          </h2>
+          <p style={{ fontSize:16, color:'var(--muted)', marginBottom:36, lineHeight:1.7, textAlign:'center' }}>
             Responderemos antes de 24 horas.
           </p>
 
           {sent ? (
-            <div style={{ background:'rgba(16,185,129,.1)', border:'1px solid rgba(16,185,129,.25)', borderRadius:18, padding:'52px 32px' }}>
-              <div style={{ fontSize:52, marginBottom:16 }}>✅</div>
-              <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:900, color:'#10B981', marginBottom:10 }}>Mensaje enviado</h3>
-              <p style={{ color:'rgba(255,255,255,.5)', fontSize:15, lineHeight:1.65 }}>Gracias por escribirnos. Te responderemos en breve.</p>
-              <button onClick={() => setSent(false)} style={{ marginTop:24, background:'none', border:'none', color:'rgba(255,255,255,.4)', fontFamily:'inherit', fontSize:13, fontWeight:600, cursor:'pointer', transition:'color .15s' }}
-                onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>
+            <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:14, padding:'48px 32px', textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+              <h3 style={{ fontSize:20, fontWeight:800, color:'var(--dark)', letterSpacing:'-.02em', marginBottom:10 }}>Mensaje enviado</h3>
+              <p style={{ color:'var(--muted)', fontSize:15, lineHeight:1.65 }}>Te responderemos en menos de 24 horas.</p>
+              <button onClick={() => setSent(false)} style={{ marginTop:20, background:'none', border:'none', color:'var(--blue)', fontFamily:'inherit', fontSize:14, fontWeight:600, cursor:'pointer' }}>
                 Enviar otro mensaje
               </button>
             </div>
           ) : (
-            <form onSubmit={e => { e.preventDefault(); setSent(true); setForm({name:'',email:'',message:''}); }}
-              style={{ display:'flex', flexDirection:'column', gap:14, textAlign:'left' }}>
+            <form onSubmit={e => { e.preventDefault(); setSent(true); setForm({ name:'', email:'', message:'' }); }}
+              style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:14, padding:'clamp(24px,4vw,36px)', display:'flex', flexDirection:'column', gap:14 }}>
               {[
                 { label:'Nombre', key:'name', type:'text', placeholder:'Tu nombre' },
                 { label:'Email',  key:'email', type:'email', placeholder:'tu@email.com' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ fontSize:12.5, fontWeight:600, color:'rgba(255,255,255,.45)', display:'block', marginBottom:8, letterSpacing:'.04em', textTransform:'uppercase' }}>{f.label}</label>
+                  <label style={{ fontSize:13, fontWeight:600, color:'var(--mid)', display:'block', marginBottom:7 }}>{f.label}</label>
                   <input type={f.type} required placeholder={f.placeholder} value={form[f.key]}
                     onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    className="land-input" />
+                    className="fi" />
                 </div>
               ))}
               <div>
-                <label style={{ fontSize:12.5, fontWeight:600, color:'rgba(255,255,255,.45)', display:'block', marginBottom:8, letterSpacing:'.04em', textTransform:'uppercase' }}>Mensaje</label>
+                <label style={{ fontSize:13, fontWeight:600, color:'var(--mid)', display:'block', marginBottom:7 }}>Mensaje</label>
                 <textarea required placeholder="Cuéntanos en qué podemos ayudarte..." rows={4} value={form.message}
                   onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
-                  className="land-input" style={{ resize:'vertical' }} />
+                  className="fi" style={{ resize:'vertical' }} />
               </div>
-              <button type="submit" className="btn-cta" style={{ justifyContent:'center', padding:'14px', marginTop:4 }}>
+              <button type="submit" className="btn-p" style={{ justifyContent:'center', padding:'13px', marginTop:4 }}>
                 Enviar mensaje
               </button>
             </form>
@@ -841,51 +670,68 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          FOOTER
-      ════════════════════════════════════════ */}
-      <footer style={{ background:'#03040A', borderTop:'1px solid rgba(255,255,255,.05)', padding:'clamp(48px,6vw,72px) clamp(20px,6%,80px) 32px' }}>
+      {/* ══ FOOTER ═══════════════════════════════════ */}
+      <footer style={{ background:'var(--dark)', padding:'clamp(48px,6vw,68px) clamp(20px,6%,80px) 28px', borderTop:'none' }}>
         <div style={{ maxWidth:1140, margin:'0 auto' }}>
-          <div className="footer-grid" style={{ display:'grid', gridTemplateColumns:'2.2fr 1fr 1fr 1fr', gap:48, marginBottom:56 }}>
+          <div className="ftg" style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:48, marginBottom:52 }}>
 
-            {/* Brand col */}
+            {/* Brand */}
             <div>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
-                <div style={{ width:34, height:34, borderRadius:9, background:'linear-gradient(135deg,#3B82F6,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:900, color:'#fff', fontFamily:"'Syne',sans-serif" }}>W</div>
-                <span style={{ fontWeight:800, fontSize:16, fontFamily:"'Syne',sans-serif" }}>Workly</span>
+              <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:16 }}>
+                <img src="/logo.png" alt="Workly" style={{ width:32, height:32, borderRadius:7, objectFit:'cover' }} />
+                <span style={{ fontWeight:800, fontSize:16, color:'#fff', letterSpacing:'-.02em' }}>Workly</span>
               </div>
-              <p style={{ fontSize:14, color:'rgba(255,255,255,.3)', lineHeight:1.8, maxWidth:280 }}>
-                La herramienta de gestión para freelancers y autónomos que quieren centrarse en su trabajo, no en el papeleo.
+              <p style={{ fontSize:13.5, color:'rgba(255,255,255,.35)', lineHeight:1.8, maxWidth:260, marginBottom:20 }}>
+                Herramienta de gestión para freelancers y autónomos. Facturación, proyectos y contabilidad en un solo lugar.
               </p>
-              <Link to="/register" className="btn-cta" style={{ marginTop:24, display:'inline-flex', fontSize:13, padding:'10px 20px' }}>
+              <Link to="/register" className="btn-p" style={{ fontSize:13, padding:'9px 18px', display:'inline-flex' }}>
                 Empieza gratis →
               </Link>
             </div>
 
-            {/* Links */}
             {[
-              { title: 'Producto', links: NAV.map(n => ({ label: n.label, action: () => scrollTo(n.id) })) },
-              { title: 'Acceso', links: [{ label:'Iniciar sesión', href:'/login' },{ label:'Crear cuenta', href:'/register' }] },
-              { title: 'Legal', links: [{ label:'Privacidad', href:'/privacidad' },{ label:'Estado del sistema', href:'/estado' }] },
+              {
+                title:'Producto',
+                items: NAV.map(n => ({ label:n.label, onClick:() => scrollTo(n.id) })),
+              },
+              {
+                title:'Cuenta',
+                items: [
+                  { label:'Iniciar sesión',  href:'/login' },
+                  { label:'Crear cuenta',    href:'/register' },
+                  { label:'Plan y precios',  onClick:() => scrollTo('precios') },
+                ],
+              },
+              {
+                title:'Legal',
+                items: [
+                  { label:'Política de privacidad', href:'/privacidad' },
+                  { label:'Estado del sistema',     href:'/estado' },
+                ],
+              },
             ].map(col => (
               <div key={col.title}>
-                <h4 style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,.25)', marginBottom:18, textTransform:'uppercase', letterSpacing:'.1em' }}>{col.title}</h4>
+                <h4 style={{ fontSize:11.5, fontWeight:700, color:'rgba(255,255,255,.25)', marginBottom:16, textTransform:'uppercase', letterSpacing:'.1em' }}>{col.title}</h4>
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {col.links.map(l => (
-                    l.href
-                      ? <Link key={l.label} to={l.href} style={{ fontSize:14, color:'rgba(255,255,255,.4)', textDecoration:'none', transition:'color .15s' }}
-                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{l.label}</Link>
-                      : <span key={l.label} onClick={l.action} style={{ fontSize:14, color:'rgba(255,255,255,.4)', cursor:'pointer', transition:'color .15s' }}
-                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{l.label}</span>
+                  {col.items.map(item => (
+                    item.href
+                      ? <Link key={item.label} to={item.href} style={{ fontSize:14, color:'rgba(255,255,255,.4)', textDecoration:'none', transition:'color .15s' }}
+                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{item.label}</Link>
+                      : <span key={item.label} onClick={item.onClick} style={{ fontSize:14, color:'rgba(255,255,255,.4)', cursor:'pointer', transition:'color .15s' }}
+                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{item.label}</span>
                   ))}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="footer-bottom" style={{ borderTop:'1px solid rgba(255,255,255,.05)', paddingTop:24, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
-            <span style={{ fontSize:13, color:'rgba(255,255,255,.2)' }}>© {new Date().getFullYear()} Workly. Todos los derechos reservados.</span>
-            <span style={{ fontSize:13, color:'rgba(255,255,255,.15)' }}>Hecho con ♥ para freelancers</span>
+          <div style={{ borderTop:'1px solid rgba(255,255,255,.07)', paddingTop:22, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <span style={{ fontSize:13, color:'rgba(255,255,255,.2)' }}>
+              © {new Date().getFullYear()} Workly — Trabajo de Fin de Grado — DAW
+            </span>
+            <span style={{ fontSize:13, color:'rgba(255,255,255,.15)' }}>
+              React 19 · Node.js · MySQL · Stripe
+            </span>
           </div>
         </div>
       </footer>
