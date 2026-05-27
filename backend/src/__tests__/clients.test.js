@@ -9,7 +9,7 @@ import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 jest.unstable_mockModule('../config/db.js', () => ({
-  pool: { query: mockQuery },
+  pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 
 jest.unstable_mockModule('../utils/activityLogger.js', () => ({
@@ -30,6 +30,8 @@ const { default: request } = await import('supertest');
 const { default: app } = await import('../app.js');
 
 const AUTH_HEADER = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
+
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
@@ -41,13 +43,15 @@ describe('Clients - GET /api/clients', () => {
       { id: 1, name: 'Empresa A', email: 'a@empresa.com' },
       { id: 2, name: 'Empresa B', email: 'b@empresa.com' },
     ];
-    mockQuery.mockResolvedValueOnce([fakeClients]);
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+    mockQuery.mockResolvedValueOnce([[{ total: 2 }]]); // COUNT
+    mockQuery.mockResolvedValueOnce([fakeClients]);     // SELECT
 
     const res = await request(app).get('/api/clients').set(AUTH_HEADER);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    expect(res.body[0].name).toBe('Empresa A');
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data[0].name).toBe('Empresa A');
   });
 
   test('401 - sin token devuelve 401', async () => {
@@ -60,6 +64,8 @@ describe('Clients - GET /api/clients/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - cliente encontrado', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[{ id: 1, name: 'Empresa A' }]]);
 
     const res = await request(app).get('/api/clients/1').set(AUTH_HEADER);
@@ -68,6 +74,8 @@ describe('Clients - GET /api/clients/:id', () => {
   });
 
   test('404 - cliente no existe', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[]]); // sin resultados
 
     const res = await request(app).get('/api/clients/999').set(AUTH_HEADER);
@@ -80,6 +88,8 @@ describe('Clients - POST /api/clients', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('201 - cliente creado correctamente', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ insertId: 5 }]);
 
     const res = await request(app)
@@ -93,6 +103,8 @@ describe('Clients - POST /api/clients', () => {
   });
 
   test('500 - error de base de datos', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockRejectedValueOnce(new Error('DB error'));
 
     const res = await request(app)
@@ -108,6 +120,8 @@ describe('Clients - PUT /api/clients/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - cliente actualizado', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -120,6 +134,8 @@ describe('Clients - PUT /api/clients/:id', () => {
   });
 
   test('404 - cliente no encontrado al actualizar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)
@@ -135,6 +151,8 @@ describe('Clients - DELETE /api/clients/:id (soft delete)', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - cliente eliminado (soft delete)', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -146,6 +164,8 @@ describe('Clients - DELETE /api/clients/:id (soft delete)', () => {
   });
 
   test('404 - cliente no encontrado al eliminar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)
@@ -160,6 +180,8 @@ describe('Clients - GET /api/clients/deleted', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - devuelve clientes eliminados', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[{ id: 3, name: 'Borrado', is_deleted: 1 }]]);
 
     const res = await request(app).get('/api/clients/deleted').set(AUTH_HEADER);
@@ -172,6 +194,8 @@ describe('Clients - PUT /api/clients/:id/restore', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - cliente restaurado', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -183,6 +207,8 @@ describe('Clients - PUT /api/clients/:id/restore', () => {
   });
 
   test('404 - no encontrado al restaurar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)

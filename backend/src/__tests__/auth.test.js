@@ -13,11 +13,13 @@ jest.unstable_mockModule('../config/db.js', () => ({
   pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 
-// Mock bcrypt
+// Mock bcrypt - capture refs so we can control them per-test
+const mockBcryptHash    = jest.fn().mockResolvedValue('hashed_password');
+const mockBcryptCompare = jest.fn();
 jest.unstable_mockModule('bcrypt', () => ({
   default: {
-    hash: jest.fn().mockResolvedValue('hashed_password'),
-    compare: jest.fn(),
+    hash:    mockBcryptHash,
+    compare: mockBcryptCompare,
   },
 }));
 
@@ -32,6 +34,7 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 // ── Imports (después de mocks) ────────────────────────────────────────────────
 const { default: request } = await import('supertest');
 const { default: app } = await import('../app.js');
+// bcrypt controlled via mockBcryptCompare / mockBcryptHash refs
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
@@ -96,11 +99,15 @@ describe('Auth - POST /api/auth/register', () => {
 });
 
 describe('Auth - POST /api/auth/login', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    mockQuery.mockReset();
+    // jwt.sign is set via jest.unstable_mockModule with mockReturnValue - persists across tests
+    // No need to re-setup here
+  });
 
   test('200 - login correcto devuelve tokens y usuario', async () => {
-    const { default: bcrypt } = await import('bcrypt');
-    bcrypt.compare.mockResolvedValue(true);
+    // Set bcrypt mock before anything else
+    mockBcryptCompare.mockResolvedValue(true);
 
     const fakeUser = {
       id: 1,
@@ -157,8 +164,7 @@ describe('Auth - POST /api/auth/login', () => {
   });
 
   test('401 - contraseña incorrecta', async () => {
-    const { default: bcrypt } = await import('bcrypt');
-    bcrypt.compare.mockResolvedValue(false);
+    mockBcryptCompare.mockResolvedValue(false);
 
     mockQuery.mockResolvedValueOnce([[{
       id: 1, status: 'active', password: 'hashed', role: 'user',

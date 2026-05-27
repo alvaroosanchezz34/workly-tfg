@@ -9,7 +9,7 @@ import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 jest.unstable_mockModule('../config/db.js', () => ({
-  pool: { query: mockQuery },
+  pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 
 jest.unstable_mockModule('../utils/activityLogger.js', () => ({
@@ -29,6 +29,8 @@ const { default: request } = await import('supertest');
 const { default: app } = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
+
 
 const PROJECT_PAYLOAD = {
   client_id: 1,
@@ -46,6 +48,8 @@ describe('Projects - GET /api/projects', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - devuelve proyectos del usuario', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[
       { id: 1, title: 'Web corporativa', client_name: 'Cliente A' },
     ]]);
@@ -65,6 +69,8 @@ describe('Projects - GET /api/projects/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - proyecto encontrado por ID', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[{ id: 1, title: 'Web corporativa' }]]);
 
     const res = await request(app).get('/api/projects/1').set(AUTH);
@@ -73,6 +79,8 @@ describe('Projects - GET /api/projects/:id', () => {
   });
 
   test('404 - proyecto no existe', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[]]); // no results
 
     const res = await request(app).get('/api/projects/999').set(AUTH);
@@ -86,6 +94,7 @@ describe('Projects - POST /api/projects', () => {
 
   test('201 - proyecto creado correctamente con cliente válido', async () => {
     mockQuery
+      .mockResolvedValueOnce(USER)                   // authenticate → usuario
       .mockResolvedValueOnce([[{ id: 1 }]])         // SELECT cliente válido
       .mockResolvedValueOnce([{ insertId: 10 }]);    // INSERT proyecto
 
@@ -100,6 +109,8 @@ describe('Projects - POST /api/projects', () => {
   });
 
   test('403 - cliente no válido o no pertenece al usuario', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[]]); // cliente no encontrado
 
     const res = await request(app)
@@ -129,6 +140,8 @@ describe('Projects - PUT /api/projects/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - proyecto actualizado correctamente', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -141,6 +154,8 @@ describe('Projects - PUT /api/projects/:id', () => {
   });
 
   test('404 - proyecto no existe al actualizar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)
@@ -156,6 +171,8 @@ describe('Projects - DELETE /api/projects/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - proyecto eliminado (soft delete)', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -167,6 +184,8 @@ describe('Projects - DELETE /api/projects/:id', () => {
   });
 
   test('404 - proyecto no encontrado al eliminar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)

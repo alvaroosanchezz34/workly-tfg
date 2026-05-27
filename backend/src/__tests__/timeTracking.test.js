@@ -1,14 +1,18 @@
 /**
- * Tests: Tasks Controller
- * Cubre: GET/POST/PUT/DELETE /api/projects/:projectId/tasks
- *        PATCH /api/projects/:projectId/tasks/:taskId/move
+ * Tests: TimeTracking Controller
+ * Rutas reales:
+ *   GET    /api/time
+ *   GET    /api/time/active
+ *   POST   /api/time/start
+ *   PATCH  /api/time/:id/stop   (NO POST /api/time/stop)
+ *   DELETE /api/time/:id
  */
 
 import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 jest.unstable_mockModule('../config/db.js', () => ({
-    pool: { query: mockQuery },
+    pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 jest.unstable_mockModule('jsonwebtoken', () => ({
     default: {
@@ -21,160 +25,154 @@ const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
-const PID  = '10';
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
 
-describe('Tasks - GET /api/projects/:id/tasks', () => {
+describe('TimeTracking - GET /api/time', () => {
     beforeEach(() => jest.clearAllMocks());
 
-    test('200 - devuelve lista de tareas del proyecto', async () => {
+    test('200 - devuelve entradas y totales', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 10 }]])
+            .mockResolvedValueOnce(USER)
             .mockResolvedValueOnce([[
-                { id: 1, title: 'Diseñar UI',  status: 'todo',        priority: 'high',   position: 0 },
-                { id: 2, title: 'Backend API', status: 'in_progress', priority: 'medium', position: 0 },
-            ]]);
-        const res = await request(app).get(`/api/projects/${PID}/tasks`).set(AUTH);
+                { id: 1, description: 'Reunión cliente', elapsed: 3600, earned: 50,  project_name: 'Workly' },
+                { id: 2, description: 'Desarrollo API',  elapsed: 7200, earned: 100, project_name: 'Workly' },
+            ]])
+            .mockResolvedValueOnce([[{ total_seconds: 10800, total_earned: 150 }]]);
+
+        const res = await request(app).get('/api/time').set(AUTH);
+
         expect(res.status).toBe(200);
-        expect(Array.isArray(res.body)).toBe(true);
-        expect(res.body).toHaveLength(2);
-        expect(res.body[0].title).toBe('Diseñar UI');
+        expect(res.body).toHaveProperty('entries');
+        expect(res.body).toHaveProperty('totals');
+        expect(res.body.entries).toHaveLength(2);
     });
 
-    test('401 - sin token', async () => {
-        const res = await request(app).get(`/api/projects/${PID}/tasks`);
-        expect(res.status).toBe(401);
-    });
-
-    test('404 - proyecto no pertenece al usuario', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // proyecto no encontrado
-        const res = await request(app).get(`/api/projects/999/tasks`).set(AUTH);
-        expect(res.status).toBe(404);
-        expect(res.body.message).toMatch(/no encontrado/i);
-    });
-});
-
-describe('Tasks - POST /api/projects/:id/tasks', () => {
-    beforeEach(() => jest.clearAllMocks());
-
-    test('201 - tarea creada correctamente', async () => {
+    test('200 - lista vacía si no hay entradas', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 10 }]])
-            .mockResolvedValueOnce([[{ maxPos: 2 }]])
-            .mockResolvedValueOnce([{ insertId: 42 }]);
-        const res = await request(app)
-            .post(`/api/projects/${PID}/tasks`).set(AUTH)
-            .send({ title: 'Nueva tarea', priority: 'high', status: 'todo' });
-        expect(res.status).toBe(201);
-        expect(res.body.taskId).toBe(42);
-    });
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]])
+            .mockResolvedValueOnce([[{ total_seconds: 0, total_earned: 0 }]]);
 
-    test('400 - título vacío', async () => {
-        const res = await request(app)
-            .post(`/api/projects/${PID}/tasks`).set(AUTH)
-            .send({ title: '   ', priority: 'medium' });
-        expect(res.status).toBe(400);
-        expect(res.body.message).toMatch(/título/i);
-    });
+        const res = await request(app).get('/api/time').set(AUTH);
 
-    test('201 - usa valores por defecto (status=todo, priority=medium)', async () => {
-        mockQuery
-            .mockResolvedValueOnce([[{ id: 10 }]])
-            .mockResolvedValueOnce([[{ maxPos: 0 }]])
-            .mockResolvedValueOnce([{ insertId: 5 }]);
-        const res = await request(app)
-            .post(`/api/projects/${PID}/tasks`).set(AUTH)
-            .send({ title: 'Tarea mínima' });
-        expect(res.status).toBe(201);
-        expect(res.body.taskId).toBe(5);
-    });
-
-    test('404 - proyecto no encontrado al crear', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // proyecto no existe
-        const res = await request(app)
-            .post(`/api/projects/${PID}/tasks`).set(AUTH)
-            .send({ title: 'Tarea', priority: 'low' });
-        expect(res.status).toBe(404);
-    });
-});
-
-describe('Tasks - PUT /api/projects/:id/tasks/:taskId', () => {
-    beforeEach(() => jest.clearAllMocks());
-
-    test('200 - tarea actualizada', async () => {
-        mockQuery
-            .mockResolvedValueOnce([[{ id: 1 }]])
-            .mockResolvedValueOnce([{ affectedRows: 1 }]);
-        const res = await request(app)
-            .put(`/api/projects/${PID}/tasks/1`).set(AUTH)
-            .send({ title: 'Título actualizado', priority: 'urgent' });
         expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/actualizada/i);
-    });
-
-    test('404 - tarea no encontrada', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // no existe
-        const res = await request(app)
-            .put(`/api/projects/${PID}/tasks/999`).set(AUTH)
-            .send({ title: 'Cambio' });
-        expect(res.status).toBe(404);
+        expect(res.body.entries).toHaveLength(0);
     });
 
     test('401 - sin autenticación', async () => {
-        const res = await request(app)
-            .put(`/api/projects/${PID}/tasks/1`)
-            .send({ title: 'Sin token' });
+        const res = await request(app).get('/api/time');
         expect(res.status).toBe(401);
     });
 });
 
-describe('Tasks - DELETE /api/projects/:id/tasks/:taskId', () => {
+describe('TimeTracking - GET /api/time/active', () => {
     beforeEach(() => jest.clearAllMocks());
 
-    test('200 - tarea eliminada', async () => {
+    test('200 - devuelve entrada activa', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 1 }]])
-            .mockResolvedValueOnce([{ affectedRows: 1 }]);
-        const res = await request(app).delete(`/api/projects/${PID}/tasks/1`).set(AUTH);
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ id: 5, description: 'Tarea en curso', stopped_at: null, project_name: 'Workly' }]]);
+
+        const res = await request(app).get('/api/time/active').set(AUTH);
+
         expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/eliminada/i);
+        expect(res.body.id).toBe(5);
     });
 
-    test('404 - tarea no existe', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // no encontrada
-        const res = await request(app).delete(`/api/projects/${PID}/tasks/999`).set(AUTH);
+    test('200 - null si no hay temporizador activo', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]); // sin entrada activa
+
+        const res = await request(app).get('/api/time/active').set(AUTH);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toBeNull();
+    });
+});
+
+describe('TimeTracking - POST /api/time/start', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    test('201 - inicia temporizador correctamente', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)                              // authenticate
+            .mockResolvedValueOnce([{ affectedRows: 0 }])            // UPDATE parar anterior
+            .mockResolvedValueOnce([{ insertId: 10 }])               // INSERT nuevo
+            .mockResolvedValueOnce([[{ id: 10, description: 'Implementando tests', started_at: new Date(), stopped_at: null, project_name: null }]]); // SELECT entry
+
+        const res = await request(app)
+            .post('/api/time/start').set(AUTH)
+            .send({ description: 'Implementando tests', hourly_rate: 50, billable: 1 });
+
+        expect(res.status).toBe(201);
+        expect(res.body.id).toBe(10);
+    });
+
+    test('201 - sin project_id ni hourly_rate (campos opcionales)', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ affectedRows: 0 }])
+            .mockResolvedValueOnce([{ insertId: 12 }])
+            .mockResolvedValueOnce([[{ id: 12, description: null, started_at: new Date(), stopped_at: null }]]);
+
+        const res = await request(app)
+            .post('/api/time/start').set(AUTH)
+            .send({ description: 'Trabajo sin proyecto' });
+
+        expect(res.status).toBe(201);
+    });
+});
+
+describe('TimeTracking - PATCH /api/time/:id/stop', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    test('200 - para el temporizador activo', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ id: 5, started_at: new Date(Date.now()-3600000), stopped_at: null, hourly_rate: 50, duration: 3600 }]]) // SELECT entry
+            .mockResolvedValueOnce([{ affectedRows: 1 }])    // UPDATE stopped_at
+            .mockResolvedValueOnce([[{ id: 5, duration: 3600, earned: 50, project_name: null }]]); // SELECT updated
+
+        const res = await request(app).patch('/api/time/5/stop').set(AUTH);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toBeTruthy(); // returns updated entry object
+    });
+
+    test('404 - entrada no existe', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]); // entry not found → 404
+
+        const res = await request(app).patch('/api/time/999/stop').set(AUTH);
+
         expect(res.status).toBe(404);
     });
 });
 
-describe('Tasks - PATCH /api/projects/:id/tasks/:taskId/move', () => {
+describe('TimeTracking - DELETE /api/time/:id', () => {
     beforeEach(() => jest.clearAllMocks());
 
-    test('200 - tarea movida a otra columna', async () => {
+    test('200 - entrada eliminada', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 1 }]])
-            .mockResolvedValueOnce([{ affectedRows: 1 }]);
-        const res = await request(app)
-            .patch(`/api/projects/${PID}/tasks/1/move`).set(AUTH)
-            .send({ status: 'in_progress', position: 2 });
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ id: 5, user_id: 1 }]]) // existe
+            .mockResolvedValueOnce([{ affectedRows: 1 }]);     // DELETE
+
+        const res = await request(app).delete('/api/time/5').set(AUTH);
+
         expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/movida/i);
+        expect(res.body.message).toMatch(/eliminad/i);
     });
 
-    test('200 - position 0 por defecto si no se envía', async () => {
+    test('404 - entrada no existe', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 1 }]])
-            .mockResolvedValueOnce([{ affectedRows: 1 }]);
-        const res = await request(app)
-            .patch(`/api/projects/${PID}/tasks/1/move`).set(AUTH)
-            .send({ status: 'done' });
-        expect(res.status).toBe(200);
-    });
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]); // no encontrada
 
-    test('404 - tarea no existe al mover', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // no encontrada
-        const res = await request(app)
-            .patch(`/api/projects/${PID}/tasks/999/move`).set(AUTH)
-            .send({ status: 'done', position: 0 });
+        const res = await request(app).delete('/api/time/999').set(AUTH);
+
         expect(res.status).toBe(404);
     });
 });

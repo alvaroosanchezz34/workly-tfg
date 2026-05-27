@@ -9,7 +9,7 @@ import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 jest.unstable_mockModule('../config/db.js', () => ({
-  pool: { query: mockQuery },
+  pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 
 jest.unstable_mockModule('../utils/activityLogger.js', () => ({
@@ -29,6 +29,8 @@ const { default: request } = await import('supertest');
 const { default: app } = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
+
 
 const EXPENSE_PAYLOAD = {
   category: 'software',
@@ -44,13 +46,15 @@ describe('Expenses - GET /api/expenses', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - devuelve gastos del usuario', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+    mockQuery.mockResolvedValueOnce([[{ total: 1 }]]); // COUNT
     mockQuery.mockResolvedValueOnce([[
       { id: 1, category: 'software', amount: 99.99 },
     ]]);
 
     const res = await request(app).get('/api/expenses').set(AUTH);
     expect(res.status).toBe(200);
-    expect(res.body[0].category).toBe('software');
+    expect(res.body.data[0].category).toBe('software');
   });
 
   test('401 - sin token devuelve 401', async () => {
@@ -63,6 +67,8 @@ describe('Expenses - GET /api/expenses/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - gasto encontrado por ID', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[{ id: 1, description: 'Licencia VSCode' }]]);
 
     const res = await request(app).get('/api/expenses/1').set(AUTH);
@@ -71,6 +77,8 @@ describe('Expenses - GET /api/expenses/:id', () => {
   });
 
   test('404 - gasto no encontrado', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([[]]); // empty
 
     const res = await request(app).get('/api/expenses/999').set(AUTH);
@@ -83,6 +91,8 @@ describe('Expenses - POST /api/expenses', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('201 - gasto creado correctamente', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ insertId: 3 }]);
 
     const res = await request(app)
@@ -96,6 +106,8 @@ describe('Expenses - POST /api/expenses', () => {
   });
 
   test('500 - error de DB al crear', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockRejectedValueOnce(new Error('DB error'));
 
     const res = await request(app)
@@ -111,6 +123,8 @@ describe('Expenses - PUT /api/expenses/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - gasto actualizado correctamente', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -123,6 +137,8 @@ describe('Expenses - PUT /api/expenses/:id', () => {
   });
 
   test('404 - gasto no existe al actualizar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)
@@ -138,6 +154,8 @@ describe('Expenses - DELETE /api/expenses/:id', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('200 - gasto eliminado (soft delete)', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
@@ -149,6 +167,8 @@ describe('Expenses - DELETE /api/expenses/:id', () => {
   });
 
   test('404 - gasto no encontrado al eliminar', async () => {
+    mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
     mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)

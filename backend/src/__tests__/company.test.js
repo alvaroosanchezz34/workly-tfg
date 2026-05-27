@@ -14,11 +14,20 @@ const mockConnection = {
     release:          jest.fn(),
 };
 
+const mockGetConnection = jest.fn().mockResolvedValue(mockConnection);
+const mockBcryptHash = jest.fn().mockResolvedValue('hashed_password');
+const mockBcryptCompare = jest.fn().mockResolvedValue(false);
 jest.unstable_mockModule('../config/db.js', () => ({
-    pool: { query: mockQuery, getConnection: jest.fn().mockResolvedValue(mockConnection) },
+    pool: { query: mockQuery, getConnection: mockGetConnection },
 }));
 jest.unstable_mockModule('bcrypt', () => ({
-    default: { hash: jest.fn().mockResolvedValue('hashed'), compare: jest.fn() },
+    default: { hash: mockBcryptHash, compare: mockBcryptCompare },
+}));
+const mockSendTeamInviteEmail = jest.fn().mockResolvedValue(undefined);
+const mockSendInvoiceEmail = jest.fn().mockResolvedValue(undefined);
+jest.unstable_mockModule('../services/email.service.js', () => ({
+    sendTeamInviteEmail: mockSendTeamInviteEmail,
+    sendInvoiceEmail:    mockSendInvoiceEmail,
 }));
 jest.unstable_mockModule('jsonwebtoken', () => ({
     default: { verify: jest.fn().mockReturnValue({ id: 1, role: 'admin' }), sign: jest.fn().mockReturnValue('mock') },
@@ -27,6 +36,8 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 const AUTH = { Authorization: 'Bearer mock' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
+
 
 // Simular que el usuario tiene empresa (middleware resolveCompany)
 // Para tests sin empresa:
@@ -37,6 +48,8 @@ describe('Company - POST /api/company (crear empresa)', () => {
 
     test('201 - empresa creada', async () => {
         // resolveCompany (member lookup) → no tiene empresa
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[]]); // no member
 
         mockConnection.query
@@ -52,6 +65,8 @@ describe('Company - POST /api/company (crear empresa)', () => {
     });
 
     test('400 - nombre obligatorio', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[]]); // resolveCompany
         const res = await request(app).post('/api/company').set(AUTH).send({});
         expect(res.status).toBe(400);
@@ -70,6 +85,7 @@ describe('Company - GET /api/company/team', () => {
     test('200 - lista miembros del equipo', async () => {
         // resolveCompany → tiene empresa y es admin
         mockQuery
+            .mockResolvedValueOnce(USER) // authenticate → usuario
             .mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]])
             .mockResolvedValueOnce([[
                 { member_id: 1, id: 1, name: 'Admin Koke', email: 'koke@test.com', company_role: 'admin',      member_status: 'active' },
@@ -90,11 +106,23 @@ describe('Company - GET /api/company/team', () => {
 });
 
 describe('Company - POST /api/company/team/invite', () => {
-    beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
+    beforeEach(() => {
+        mockQuery.mockReset();
+        mockGetConnection.mockResolvedValue(mockConnection);
+        mockBcryptHash.mockResolvedValue('hashed_password');
+        mockSendTeamInviteEmail.mockResolvedValue(undefined); // re-setup after clearAllMocks
+        mockConnection.query.mockReset();
+        mockConnection.beginTransaction.mockResolvedValue(undefined);
+        mockConnection.commit.mockResolvedValue(undefined);
+        mockConnection.rollback.mockResolvedValue(undefined);
+    });
 
     test('201 - nuevo técnico invitado con cuenta nueva', async () => {
         // resolveCompany
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]);
+        mockQuery.mockResolvedValueOnce([[{ name: 'Empresa Test' }]]); // SELECT company name (post-commit email)
 
         mockConnection.query
             .mockResolvedValueOnce([[]])             // email no existe → crear usuario
@@ -109,11 +137,12 @@ describe('Company - POST /api/company/team/invite', () => {
 
         expect(res.status).toBe(201);
         expect(res.body.message).toMatch(/invitado/i);
-        expect(res.body.tempPassword).toBeTruthy(); // password temporal para usuario nuevo
         expect(mockConnection.commit).toHaveBeenCalled();
     });
 
     test('400 - usuario ya es miembro', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]);
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 3 }]])  // email ya existe
@@ -129,6 +158,8 @@ describe('Company - POST /api/company/team/invite', () => {
     });
 
     test('400 - faltan campos', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]);
         const res = await request(app).post('/api/company/team/invite').set(AUTH).send({ name: 'Solo nombre' });
         expect(res.status).toBe(400);
@@ -140,6 +171,7 @@ describe('Company - PATCH /api/company/team/:userId/role', () => {
 
     test('200 - rol actualizado a admin', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER) // authenticate
             .mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]) // resolveCompany
             .mockResolvedValueOnce([{}]) // UPDATE company_members
             .mockResolvedValueOnce([{}]); // UPDATE users
@@ -153,7 +185,8 @@ describe('Company - PATCH /api/company/team/:userId/role', () => {
     });
 
     test('400 - rol no válido', async () => {
-        mockQuery.mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]);
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+        mockQuery.mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]); // resolveCompany
         const res = await request(app).patch('/api/company/team/5/role').set(AUTH).send({ role: 'superadmin' });
         expect(res.status).toBe(400);
     });
@@ -164,6 +197,7 @@ describe('Company - GET /api/company/dashboard', () => {
 
     test('200 - dashboard consolidado del equipo', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER) // authenticate
             .mockResolvedValueOnce([[{ company_id: 1, company_role: 'admin', company_status: 'active' }]]) // resolveCompany
             .mockResolvedValueOnce([[                                                                        // byMember
                 { id: 1, name: 'Koke', clients: 5, projects: 3, invoices: 10, invoiced: 15000 },

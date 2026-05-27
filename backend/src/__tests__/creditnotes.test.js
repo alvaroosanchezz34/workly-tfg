@@ -7,9 +7,9 @@ import { jest } from '@jest/globals';
 
 const mockConn = {
     query:            jest.fn(),
-    beginTransaction: jest.fn(),
-    commit:           jest.fn(),
-    rollback:         jest.fn(),
+    beginTransaction: jest.fn().mockResolvedValue(undefined),
+    commit:           jest.fn().mockResolvedValue(undefined),
+    rollback:         jest.fn().mockResolvedValue(undefined),
     release:          jest.fn(),
 };
 const mockQuery = jest.fn();
@@ -30,15 +30,18 @@ const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
 
 describe('CreditNotes - GET /api/credit-notes', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - devuelve lista de notas de crédito', async () => {
-        mockQuery.mockResolvedValueOnce([[
-            { id: 1, credit_number: 'RC-2026-0001', total_amount: 121, status: 'issued' },
-            { id: 2, credit_number: 'RC-2026-0002', total_amount: 60.5, status: 'draft' },
-        ]]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[
+                { id: 1, credit_number: 'RC-2026-0001', total_amount: 121,  status: 'issued' },
+                { id: 2, credit_number: 'RC-2026-0002', total_amount: 60.5, status: 'draft'  },
+            ]]);
 
         const res = await request(app).get('/api/credit-notes').set(AUTH);
 
@@ -48,8 +51,10 @@ describe('CreditNotes - GET /api/credit-notes', () => {
         expect(res.body[0].credit_number).toBe('RC-2026-0001');
     });
 
-    test('200 - lista vacía si no hay notas', async () => {
-        mockQuery.mockResolvedValueOnce([[]]);
+    test('200 - lista vacía', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]);
 
         const res = await request(app).get('/api/credit-notes').set(AUTH);
 
@@ -68,6 +73,7 @@ describe('CreditNotes - GET /api/credit-notes/:id', () => {
 
     test('200 - devuelve nota con items', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)
             .mockResolvedValueOnce([[{ id: 1, credit_number: 'RC-2026-0001', user_id: 1 }]])
             .mockResolvedValueOnce([[{ id: 1, description: 'Devolución', total: 121 }]]);
 
@@ -78,7 +84,9 @@ describe('CreditNotes - GET /api/credit-notes/:id', () => {
     });
 
     test('404 - nota no encontrada', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // no existe
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]); // no existe
 
         const res = await request(app).get('/api/credit-notes/999').set(AUTH);
 
@@ -89,12 +97,13 @@ describe('CreditNotes - GET /api/credit-notes/:id', () => {
 describe('CreditNotes - POST /api/credit-notes', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockQuery.mockResolvedValueOnce(USER);
         mockConn.query
-            .mockResolvedValueOnce([[{ id: 10, total_amount: 242 }]])  // factura válida
-            .mockResolvedValueOnce([[{ seq: 1 }]])                      // getNextCreditNumber
-            .mockResolvedValueOnce([{ insertId: 3 }])                  // INSERT credit_note
-            .mockResolvedValueOnce([{}])                               // INSERT item
-            .mockResolvedValueOnce([{}]);                              // UPDATE totales
+            .mockResolvedValueOnce([[{ id: 10, total_amount: 242 }]]) // factura válida
+            .mockResolvedValueOnce([[{ seq: 1 }]])                     // getNextCreditNumber
+            .mockResolvedValueOnce([{ insertId: 3 }])                 // INSERT credit_note
+            .mockResolvedValueOnce([{}])                              // INSERT item
+            .mockResolvedValueOnce([{}]);                             // UPDATE totales
     });
 
     test('201 - nota de crédito creada', async () => {
@@ -113,6 +122,8 @@ describe('CreditNotes - POST /api/credit-notes', () => {
 
     test('404 - factura no encontrada', async () => {
         jest.clearAllMocks();
+        mockConn.query.mockReset(); // reset connection mock independently
+        mockQuery.mockResolvedValueOnce(USER);
         mockConn.query.mockResolvedValueOnce([[]]); // factura no existe
 
         const res = await request(app)
@@ -124,12 +135,13 @@ describe('CreditNotes - POST /api/credit-notes', () => {
 });
 
 describe('CreditNotes - DELETE /api/credit-notes/:id', () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => { mockQuery.mockReset(); mockConn.query.mockReset(); });
 
     test('200 - nota eliminada', async () => {
         mockQuery
-            .mockResolvedValueOnce([[{ id: 1, user_id: 1 }]])  // existe
-            .mockResolvedValueOnce([{ affectedRows: 1 }]);      // UPDATE is_deleted
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ id: 1, user_id: 1 }]])
+            .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
         const res = await request(app).delete('/api/credit-notes/1').set(AUTH);
 
@@ -138,7 +150,9 @@ describe('CreditNotes - DELETE /api/credit-notes/:id', () => {
     });
 
     test('404 - nota no existe', async () => {
-        mockQuery.mockResolvedValueOnce([[]]); // no encontrada
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]); // SELECT status → no encontrada → 404
 
         const res = await request(app).delete('/api/credit-notes/999').set(AUTH);
 

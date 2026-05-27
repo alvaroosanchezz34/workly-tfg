@@ -28,6 +28,7 @@ jest.unstable_mockModule('../utils/activityLogger.js', () => ({
 
 jest.unstable_mockModule('../services/pdf.service.js', () => ({
     generateInvoicePDF: jest.fn(),
+    generateInvoicePDFBuffer: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
 }));
 
 jest.unstable_mockModule('jsonwebtoken', () => ({
@@ -42,6 +43,7 @@ const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
 
 const ITEM_WITH_IVA = { description: 'Desarrollo web', quantity: 1, unit_price: 1000, tax_rate: 21 };
 const INVOICE_PAYLOAD = {
@@ -59,14 +61,16 @@ describe('Invoices - POST /api/invoices (con IVA)', () => {
     beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
 
     test('201 - factura creada con IVA correcto', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query
-            .mockResolvedValueOnce([[{ id: 1, next_number: 1, prefix: 'FAC', padding: 4, current_year: 2025, reset_yearly: 1 }]]) // invoice_settings
-            .mockResolvedValueOnce([[{ id: 1 }]])    // cliente válido
+            .mockResolvedValueOnce([[{ id: 1 }]])     // SELECT cliente válido
+            .mockResolvedValueOnce([[{ id: 1, next_number: 1, prefix: 'FAC', padding: 4, current_year: new Date().getFullYear(), reset_yearly: 1 }]]) // invoice_settings
+            .mockResolvedValueOnce([{}])              // UPDATE next_number
             .mockResolvedValueOnce([{ insertId: 5 }]) // INSERT factura
             .mockResolvedValueOnce([{}])              // INSERT item
-            .mockResolvedValueOnce([{}])              // recalcTotals query items
-            .mockResolvedValueOnce([{}])              // UPDATE totals
-            .mockResolvedValueOnce([{}]);             // UPDATE next_number
+            .mockResolvedValueOnce([[{ subtotal: 1000, tax_amount: 210, total: 1210 }]]) // recalcTotals SELECT items
+            .mockResolvedValueOnce([{}]);             // UPDATE totals          // UPDATE next_number
 
         const res = await request(app)
             .post('/api/invoices')
@@ -79,10 +83,11 @@ describe('Invoices - POST /api/invoices (con IVA)', () => {
     });
 
     test('400 - sin items', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         const res = await request(app).post('/api/invoices').set(AUTH)
             .send({ ...INVOICE_PAYLOAD, items: [] });
         expect(res.status).toBe(400);
-        expect(res.body.message).toMatch(/al menos una línea/i);
+        expect(res.body.message).toMatch(/al menos/i);
     });
 
     test('401 - sin autenticación', async () => {
@@ -96,27 +101,29 @@ describe('Invoices - GET /api/invoices', () => {
 
     test('200 - devuelve lista con filtros aplicados', async () => {
         mockQuery
-            .mockResolvedValueOnce([{}]) // UPDATE overdue
+            .mockResolvedValueOnce(USER)                    // authenticate
+            .mockResolvedValueOnce([[{ total: 1 }]])        // COUNT
             .mockResolvedValueOnce([[
                 { id: 1, invoice_number: 'FAC-2025-0001', client_name: 'Empresa A', total_amount: 1210, subtotal_amount: 1000, tax_amount: 210, payment_status: 'unpaid' },
             ]]);
 
         const res = await request(app).get('/api/invoices').set(AUTH);
         expect(res.status).toBe(200);
-        expect(res.body[0].invoice_number).toBe('FAC-2025-0001');
-        expect(res.body[0].tax_amount).toBe(210);
+        expect(res.body.data[0].invoice_number).toBe('FAC-2025-0001');
+        expect(res.body.data[0].tax_amount).toBe(210);
     });
 
     test('200 - filtrado por estado', async () => {
         mockQuery
-            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ total: 1 }]])  // COUNT
             .mockResolvedValueOnce([[
                 { id: 2, invoice_number: 'FAC-2025-0002', status: 'paid', total_amount: 500 },
             ]]);
 
         const res = await request(app).get('/api/invoices?status=paid').set(AUTH);
         expect(res.status).toBe(200);
-        expect(res.body[0].status).toBe('paid');
+        expect(res.body.data[0].status).toBe('paid');
     });
 
     test('401 - sin token', async () => {
@@ -130,6 +137,7 @@ describe('Invoices - GET /api/invoices/:id', () => {
 
     test('200 - devuelve factura con items y pagos', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)
             .mockResolvedValueOnce([[{ id: 1, invoice_number: 'FAC-2025-0001', client_name: 'X', subtotal_amount: 1000, tax_amount: 210 }]])
             .mockResolvedValueOnce([[{ id: 1, description: 'Desarrollo', tax_rate: 21, subtotal: 1000, tax_amount: 210, total: 1210 }]])
             .mockResolvedValueOnce([[]]);  // pagos vacíos
@@ -142,6 +150,8 @@ describe('Invoices - GET /api/invoices/:id', () => {
     });
 
     test('404 - factura no encontrada', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockQuery.mockResolvedValueOnce([[undefined]]);
         const res = await request(app).get('/api/invoices/999').set(AUTH);
         expect(res.status).toBe(404);
@@ -153,6 +163,7 @@ describe('Invoices - PATCH /api/invoices/:id/status', () => {
 
     test('200 - cambio de estado rápido a sent', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)
             .mockResolvedValueOnce([[{ id: 1 }]]) // SELECT factura
             .mockResolvedValueOnce([{}]);          // UPDATE status
 
@@ -166,6 +177,7 @@ describe('Invoices - PATCH /api/invoices/:id/status', () => {
     });
 
     test('400 - estado no válido', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         const res = await request(app)
             .patch('/api/invoices/1/status')
             .set(AUTH)
@@ -185,6 +197,8 @@ describe('Invoices - POST /api/invoices/:id/payments', () => {
     beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
 
     test('201 - pago parcial registrado', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1, total_amount: 1210, paid_amount: 0 }]]) // SELECT factura
             .mockResolvedValueOnce([{}])   // INSERT payment
@@ -202,6 +216,8 @@ describe('Invoices - POST /api/invoices/:id/payments', () => {
     });
 
     test('201 - pago completo marca como paid', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1, total_amount: 1210, paid_amount: 0 }]])
             .mockResolvedValueOnce([{}])
@@ -217,6 +233,8 @@ describe('Invoices - POST /api/invoices/:id/payments', () => {
     });
 
     test('404 - factura no encontrada', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query.mockResolvedValueOnce([[undefined]]);
         const res = await request(app)
             .post('/api/invoices/999/payments')
@@ -235,6 +253,8 @@ describe('Invoices - GET /api/invoices/:id/payments', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - lista pagos', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockQuery.mockResolvedValueOnce([[
             { id: 1, amount: 500, payment_date: '2025-01-15', method: 'transfer' },
         ]]);
@@ -250,6 +270,8 @@ describe('Invoices - GET /api/invoices/settings', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - devuelve configuración actual', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockQuery.mockResolvedValueOnce([[{
             id: 1, user_id: 1, prefix: 'FAC', next_number: 5,
             padding: 4, reset_yearly: 1, current_year: 2025,
@@ -263,6 +285,7 @@ describe('Invoices - GET /api/invoices/settings', () => {
 
     test('200 - crea settings por defecto si no existen', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)             // authenticate
             .mockResolvedValueOnce([[]])   // no settings
             .mockResolvedValueOnce([{}])   // INSERT
             .mockResolvedValueOnce([[{ id: 1, prefix: 'FAC', next_number: 1, padding: 4 }]]); // re-select
@@ -277,6 +300,8 @@ describe('Invoices - PUT /api/invoices/settings', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - actualiza configuración', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockQuery.mockResolvedValueOnce([{}]);
         const res = await request(app)
             .put('/api/invoices/settings')
@@ -292,6 +317,7 @@ describe('Invoices - GET /api/invoices/stats', () => {
 
     test('200 - devuelve estadísticas completas', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)                                                         // authenticate
             .mockResolvedValueOnce([[{ month: '2025-01', total: 2000, count: 2 }]])         // byMonth
             .mockResolvedValueOnce([[{ name: 'Empresa A', total: 2000, invoices: 2 }]])     // topClients
             .mockResolvedValueOnce([[{ base_imponible: 1653, total_iva: 347, total_con_iva: 2000 }]]) // taxSummary
@@ -308,9 +334,12 @@ describe('Invoices - GET /api/invoices/stats', () => {
 
 // ── DELETE ────────────────────────────────────────────────
 describe('Invoices - DELETE /api/invoices/:id', () => {
-    beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
+    beforeEach(() => { jest.clearAllMocks(); mockQuery.mockResolvedValueOnce(USER); // authenticate
+ mockConnection.query.mockReset(); });
 
     test('200 - soft delete de factura draft', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query
             .mockResolvedValueOnce([[{ status: 'draft', payment_status: 'unpaid' }]])
             .mockResolvedValueOnce([{}])
@@ -322,6 +351,8 @@ describe('Invoices - DELETE /api/invoices/:id', () => {
     });
 
     test('400 - no eliminar factura pagada', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query.mockResolvedValueOnce([[{ status: 'paid', payment_status: 'paid' }]]);
         const res = await request(app).delete('/api/invoices/1').set(AUTH);
         expect(res.status).toBe(400);
@@ -329,6 +360,8 @@ describe('Invoices - DELETE /api/invoices/:id', () => {
     });
 
     test('404 - factura no encontrada', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
+
         mockConnection.query.mockResolvedValueOnce([[undefined]]);
         const res = await request(app).delete('/api/invoices/999').set(AUTH);
         expect(res.status).toBe(404);

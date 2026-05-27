@@ -7,7 +7,7 @@ import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 jest.unstable_mockModule('../config/db.js', () => ({
-    pool: { query: mockQuery },
+    pool: { query: mockQuery, getConnection: jest.fn() },
 }));
 jest.unstable_mockModule('../utils/activityLogger.js', () => ({
     logActivity: jest.fn().mockResolvedValue(undefined),
@@ -23,15 +23,18 @@ const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 
 const AUTH = { Authorization: 'Bearer mock_token' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
 
 describe('Services - GET /api/services', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - devuelve catálogo de servicios del usuario', async () => {
-        mockQuery.mockResolvedValueOnce([[
-            { id: 1, name: 'Desarrollo web', default_rate: 60.00, unit: 'hora' },
-            { id: 2, name: 'Diseño UI',      default_rate: 50.00, unit: 'hora' },
-        ]]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[
+                { id: 1, name: 'Desarrollo web', default_rate: 60.00, unit: 'hora' },
+                { id: 2, name: 'Diseño UI',      default_rate: 50.00, unit: 'hora' },
+            ]]);
 
         const res = await request(app).get('/api/services').set(AUTH);
 
@@ -42,7 +45,9 @@ describe('Services - GET /api/services', () => {
     });
 
     test('200 - lista vacía si no hay servicios', async () => {
-        mockQuery.mockResolvedValueOnce([[]]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[]]);
 
         const res = await request(app).get('/api/services').set(AUTH);
 
@@ -60,7 +65,9 @@ describe('Services - POST /api/services', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('201 - servicio creado correctamente', async () => {
-        mockQuery.mockResolvedValueOnce([{ insertId: 7 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ insertId: 7 }]);
 
         const res = await request(app)
             .post('/api/services').set(AUTH)
@@ -71,6 +78,8 @@ describe('Services - POST /api/services', () => {
     });
 
     test('400 - nombre vacío', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+
         const res = await request(app)
             .post('/api/services').set(AUTH)
             .send({ default_rate: 50 });
@@ -80,7 +89,9 @@ describe('Services - POST /api/services', () => {
     });
 
     test('201 - sin tarifa ni unidad (campos opcionales)', async () => {
-        mockQuery.mockResolvedValueOnce([{ insertId: 8 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ insertId: 8 }]);
 
         const res = await request(app)
             .post('/api/services').set(AUTH)
@@ -94,7 +105,9 @@ describe('Services - PUT /api/services/:id', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - servicio actualizado', async () => {
-        mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
         const res = await request(app)
             .put('/api/services/1').set(AUTH)
@@ -105,6 +118,8 @@ describe('Services - PUT /api/services/:id', () => {
     });
 
     test('400 - nombre vacío al actualizar', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+
         const res = await request(app)
             .put('/api/services/1').set(AUTH)
             .send({ default_rate: 80 });
@@ -114,7 +129,9 @@ describe('Services - PUT /api/services/:id', () => {
     });
 
     test('404 - servicio no encontrado', async () => {
-        mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ affectedRows: 0 }]);
 
         const res = await request(app)
             .put('/api/services/999').set(AUTH)
@@ -128,7 +145,9 @@ describe('Services - DELETE /api/services/:id', () => {
     beforeEach(() => jest.clearAllMocks());
 
     test('200 - servicio eliminado (soft delete)', async () => {
-        mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
         const res = await request(app).delete('/api/services/1').set(AUTH);
 
@@ -137,7 +156,9 @@ describe('Services - DELETE /api/services/:id', () => {
     });
 
     test('404 - servicio no existe', async () => {
-        mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([{ affectedRows: 0 }]);
 
         const res = await request(app).delete('/api/services/999').set(AUTH);
 

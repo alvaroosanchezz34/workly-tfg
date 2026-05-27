@@ -25,6 +25,8 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 const { default: request } = await import('supertest');
 const { default: app }     = await import('../app.js');
 const AUTH = { Authorization: 'Bearer mock' };
+const USER = [[{ id: 1, name: 'Koke', email: 'koke@test.com', role: 'user', plan: 'pro', plan_status: 'active', company_id: null }]];
+
 
 const QUOTE_PAYLOAD = {
     client_id:   1,
@@ -38,6 +40,7 @@ describe('Quotes - POST /api/quotes', () => {
     beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
 
     test('201 - presupuesto creado', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1 }]])    // cliente válido
             .mockResolvedValueOnce([[{ seq: 1 }]])   // getNextQuoteNumber count
@@ -54,6 +57,7 @@ describe('Quotes - POST /api/quotes', () => {
     });
 
     test('400 - sin items', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         const res = await request(app).post('/api/quotes').set(AUTH).send({ ...QUOTE_PAYLOAD, items: [] });
         expect(res.status).toBe(400);
     });
@@ -69,7 +73,7 @@ describe('Quotes - GET /api/quotes', () => {
 
     test('200 - lista presupuestos', async () => {
         mockQuery
-            .mockResolvedValueOnce([{}]) // UPDATE expired
+            .mockResolvedValueOnce(USER)
             .mockResolvedValueOnce([[{ id: 1, quote_number: 'PRE-2025-0001', status: 'draft', client_name: 'Empresa A' }]]);
 
         const res = await request(app).get('/api/quotes').set(AUTH);
@@ -82,6 +86,7 @@ describe('Quotes - POST /api/quotes/:id/convert', () => {
     beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
 
     test('201 - convierte presupuesto a factura', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1, client_id: 1, project_id: null, issue_date: '2025-01-01', expiry_date: '2025-01-31', notes: 'Test', subtotal_amount: 1000, tax_amount: 210, total_amount: 1210, converted_to_invoice_id: null }]])
             .mockResolvedValueOnce([[{ prefix: 'FAC', next_number: 1, padding: 4, current_year: 2025 }]]) // settings
@@ -103,6 +108,7 @@ describe('Quotes - POST /api/quotes/:id/convert', () => {
     });
 
     test('400 - presupuesto ya convertido', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         mockConnection.query.mockResolvedValueOnce([[{ id: 1, converted_to_invoice_id: 5 }]]);
         const res = await request(app).post('/api/quotes/1/convert').set(AUTH).send({});
         expect(res.status).toBe(400);
@@ -110,6 +116,7 @@ describe('Quotes - POST /api/quotes/:id/convert', () => {
     });
 
     test('404 - presupuesto no encontrado', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate
         mockConnection.query.mockResolvedValueOnce([[undefined]]);
         const res = await request(app).post('/api/quotes/999/convert').set(AUTH).send({});
         expect(res.status).toBe(404);
@@ -121,6 +128,7 @@ describe('Quotes - DELETE /api/quotes/:id', () => {
 
     test('200 - elimina presupuesto', async () => {
         mockQuery
+            .mockResolvedValueOnce(USER)           // authenticate
             .mockResolvedValueOnce([[{ id: 1 }]]) // SELECT
             .mockResolvedValueOnce([{}]);          // UPDATE is_deleted
 
@@ -129,6 +137,8 @@ describe('Quotes - DELETE /api/quotes/:id', () => {
     });
 
     test('404 - presupuesto no encontrado', async () => {
+        mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
+
         mockQuery.mockResolvedValueOnce([[undefined]]);
         const res = await request(app).delete('/api/quotes/999').set(AUTH);
         expect(res.status).toBe(404);
