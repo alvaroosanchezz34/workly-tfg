@@ -26,6 +26,7 @@ import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
 import { getServices } from '../api/services';
 import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown, Send, Mail } from 'lucide-react';
+import { MotionTbody, MotionTr, staggerContainer, staggerRow } from '../utils/motion';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -399,7 +400,7 @@ export default function Invoices() {
                         ) : (
                             /* ── Tabla desktop ── */
                             <div className="table-wrap">
-                                <table className="data-table">
+                                <table className="data-table fm-rows">
                                     <thead>
                                         <tr>
                                             <th style={{ width:32 }}>
@@ -415,12 +416,12 @@ export default function Invoices() {
                                             <th style={{ textAlign:'right' }}>Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {invoices.map((inv, idx) => {
+                                    <MotionTbody variants={staggerContainer} initial="hidden" animate="show">
+                                        {invoices.map((inv) => {
                                             const isOverdue = inv.status === 'overdue';
                                             const payMeta   = PAY_STATUS[inv.payment_status] || PAY_STATUS.unpaid;
                                             return (
-                                                <tr key={inv.id} style={{ animationDelay:`${idx*18}ms` }}>
+                                                <MotionTr key={inv.id} variants={staggerRow}>
                                                     <td>
                                                         <input type="checkbox" aria-label={`Seleccionar factura ${inv.invoice_number}`}
                                                             checked={selectedIds.includes(inv.id)}
@@ -455,10 +456,10 @@ export default function Invoices() {
                                                         <button className="btn-icon" title="Enviar por email" style={{ display:'inline-flex', verticalAlign:'middle', marginLeft:4 }} onClick={() => openSendModal(inv)}><Send size={13}/></button>
                                                         <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(inv)}>Eliminar</button>
                                                     </td>
-                                                </tr>
+                                                </MotionTr>
                                             );
                                         })}
-                                    </tbody>
+                                    </MotionTbody>
                                 </table>
                                 <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} pageSize={pagination.pageSize} onPage={p => setPage(p)}/>
                             </div>

@@ -11,6 +11,7 @@ import QuickActions from '../components/QuickActions';
 import AISummaryWidget from '../components/ai/AISummaryWidget';
 import AIChat from '../components/ai/AIChat';
 import { TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle } from 'lucide-react';
+import { MotionDiv, staggerContainer, staggerItem } from '../utils/motion';
 
 const fmt = v => new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR' }).format(v ?? 0);
 
@@ -88,16 +89,19 @@ const Dashboard = () => {
                         )}
 
                         {/* MÉTRICAS — 5 col desktop, 2 col tablet, 2 col móvil */}
-                        <div
+                        <MotionDiv
                             className="metrics-grid"
                             style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:24 }}
+                            variants={staggerContainer}
+                            initial="hidden"
+                            animate="show"
                         >
-                            <MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} />
-                            <MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} />
-                            <MetricCard title="Beneficio neto"    value={fmt(data?.profit)}    accentColor={(data?.profit ?? 0) >= 0 ? '#1976D2' : '#F44336'} icon={<DollarSign size={16}/>} />
-                            <MetricCard title="Fact. pendientes"  value={data?.pendingInvoices ?? 0}  accentColor="#FF9800" icon={<Clock size={16}/>} />
-                            <MetricCard title="Fact. vencidas"    value={data?.overdueInvoices ?? 0}  accentColor="#F44336" icon={<AlertCircle size={16}/>} />
-                        </div>
+                            <MotionDiv variants={staggerItem}><MetricCard title="Ingresos totales"  value={fmt(data?.income)}   accentColor="#4CAF50" icon={<TrendingUp size={16}/>} /></MotionDiv>
+                            <MotionDiv variants={staggerItem}><MetricCard title="Gastos totales"    value={fmt(data?.expenses)}  accentColor="#F44336" icon={<TrendingDown size={16}/>} /></MotionDiv>
+                            <MotionDiv variants={staggerItem}><MetricCard title="Beneficio neto"    value={fmt(data?.profit)}    accentColor={(data?.profit ?? 0) >= 0 ? '#1976D2' : '#F44336'} icon={<DollarSign size={16}/>} /></MotionDiv>
+                            <MotionDiv variants={staggerItem}><MetricCard title="Fact. pendientes"  value={data?.pendingInvoices ?? 0}  accentColor="#FF9800" icon={<Clock size={16}/>} /></MotionDiv>
+                            <MotionDiv variants={staggerItem}><MetricCard title="Fact. vencidas"    value={data?.overdueInvoices ?? 0}  accentColor="#F44336" icon={<AlertCircle size={16}/>} /></MotionDiv>
+                        </MotionDiv>
 
                         {/* GRÁFICA + TOP CLIENTES — lado a lado desktop, apilado móvil */}
                         <div

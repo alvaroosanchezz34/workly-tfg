@@ -558,6 +558,12 @@ html, body {
   animation: rowIn 0.35s var(--ease-clay) both;
 }
 
+/* Filas/tarjetas animadas por framer-motion (JS) en vez de CSS keyframes,
+   para permitir el efecto stagger en cascada — evita que ambas animaciones
+   compitan por opacity/transform en el mismo elemento. */
+.data-table.fm-rows tbody tr { animation: none; }
+.kanban-col-body.fm-cards .kanban-card { animation: none; }
+
 .data-table tbody tr:hover { background: var(--bg-hover); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 

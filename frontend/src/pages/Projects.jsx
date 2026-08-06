@@ -10,6 +10,7 @@ import { getProjects, createProject, updateProject, deleteProject } from '../api
 import { getClients } from '../api/clients';
 import { Plus, FolderOpen, CalendarDays, Search, LayoutGrid, List, ClipboardList, Pencil, Trash2 } from 'lucide-react';
 import useIsMobile from '../hooks/useIsMobile';
+import { MotionDiv, MotionTbody, MotionTr, staggerContainer, staggerItem, staggerRow } from '../utils/motion';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR' }).format(v??0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' }) : '—';
@@ -28,7 +29,8 @@ const FILTER_LABELS  = { all:'Todos', pending:'Pendiente', in_progress:'En progr
 
 function KanbanCard({ project, onEdit, onDelete, isDragging, onDragStart, onDragEnd }) {
     return (
-        <div className={`kanban-card${isDragging?' dragging':''}`}
+        <MotionDiv className={`kanban-card${isDragging?' dragging':''}`}
+            variants={staggerItem}
             draggable onDragStart={() => onDragStart(project)} onDragEnd={onDragEnd}>
             <div style={{ fontSize:13, fontWeight:600, marginBottom:4, color:'var(--text-primary)' }}>{project.title}</div>
             {project.client_name && <div style={{ fontSize:11.5, color:'var(--text-secondary)', marginBottom:8 }}>{project.client_name}</div>}
@@ -41,7 +43,7 @@ function KanbanCard({ project, onEdit, onDelete, isDragging, onDragStart, onDrag
                 <button className="action-link action-link-primary" style={{ fontSize:11.5 }} onClick={() => onEdit(project)}>Editar</button>
                 <button className="action-link action-link-danger"  style={{ fontSize:11.5 }} onClick={() => onDelete(project)}>Eliminar</button>
             </div>
-        </div>
+        </MotionDiv>
     );
 }
 
@@ -190,13 +192,13 @@ export default function Projects() {
                     ) : (
                         /* ── Tabla desktop ── */
                         <div className="table-wrap">
-                            <table className="data-table">
+                            <table className="data-table fm-rows">
                                 <thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Fechas</th><th>Presupuesto</th><th style={{ textAlign:'right' }}>Acciones</th></tr></thead>
-                                <tbody>
-                                    {paginated.map((p, idx) => {
+                                <MotionTbody variants={staggerContainer} initial="hidden" animate="show">
+                                    {paginated.map((p) => {
                                         const s = STATUS[p.status] || { label:p.status, cls:'badge' };
                                         return (
-                                            <tr key={p.id} style={{ animationDelay:`${idx*25}ms` }}>
+                                            <MotionTr key={p.id} variants={staggerRow}>
                                                 <td><div style={{ fontWeight:500 }}>{p.title}</div>{p.description&&<div style={{ fontSize:12, color:'var(--text-disabled)', marginTop:2, maxWidth:260, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.description}</div>}</td>
                                                 <td style={{ color:'var(--text-secondary)' }}>{p.client_name}</td>
                                                 <td><span className={s.cls}><span className="badge-dot"/>{s.label}</span></td>
@@ -207,10 +209,10 @@ export default function Projects() {
                                                     <button className="action-link action-link-primary" onClick={() => openEdit(p)}>Editar</button>
                                                     <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(p)}>Eliminar</button>
                                                 </td>
-                                            </tr>
+                                            </MotionTr>
                                         );
                                     })}
-                                </tbody>
+                                </MotionTbody>
                             </table>
                             <Pagination page={page} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage}/>
                         </div>
@@ -234,10 +236,10 @@ export default function Projects() {
                                         </div>
                                         <span style={{ fontSize:12, fontWeight:700, color:'var(--text-disabled)' }}>{cols.length}</span>
                                     </div>
-                                    <div className="kanban-col-body">
+                                    <MotionDiv className="kanban-col-body fm-cards" variants={staggerContainer} initial="hidden" animate="show">
                                         {cols.map(p => <KanbanCard key={p.id} project={p} isDragging={dragging?.id===p.id} onDragStart={setDragging} onDragEnd={() => setDragging(null)} onEdit={openEdit} onDelete={setToDelete}/>)}
                                         {cols.length===0 && <div style={{ padding:'16px 8px', textAlign:'center', fontSize:12, color:'var(--text-disabled)' }}>Suelta aquí</div>}
-                                    </div>
+                                    </MotionDiv>
                                 </div>
                             );
                         })}
