@@ -237,7 +237,7 @@ export default function TimeTracker() {
         }
     }, [token]);
 
-    useEffect(() => { if (token) load(); }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleStart = async data => {
         await startTimer(token, data);

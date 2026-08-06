@@ -3,6 +3,7 @@ import cron   from 'node-cron';
 import crypto from 'crypto';
 import { pool } from '../config/db.js';
 import { sendInvoiceEmail } from './email.service.js';
+import { processRecurringExpenses } from '../controllers/recurringExpenses.controller.js';
 
 /**
  * Inicializa todos los jobs programados.
@@ -20,9 +21,10 @@ export const initScheduler = () => {
         await sendUpcomingDueReminders();   // ← NUEVO
         await sendQuoteExpiryWarnings();    // ← NUEVO
         await processRecurringInvoices();
+        await processRecurringExpenses();   // ← NUEVO
     }, { timezone: 'Europe/Madrid' });
 
-    console.log('[Scheduler] Jobs registrados: marcado de vencidas (09:00), presupuestos expirados (09:00), recordatorios vencidas (09:00), avisos próximos a vencer (09:00), avisos presupuestos (09:00), recurrentes (09:00)');
+    console.log('[Scheduler] Jobs registrados: marcado de vencidas (09:00), presupuestos expirados (09:00), recordatorios vencidas (09:00), avisos próximos a vencer (09:00), avisos presupuestos (09:00), recurrentes de facturas y gastos (09:00)');
 };
 
 // ── Marcar facturas como vencidas ─────────────────────────

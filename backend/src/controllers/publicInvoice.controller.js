@@ -3,6 +3,7 @@
 // Sirve los datos de una factura identificada por su public_token
 
 import { pool } from '../config/db.js';
+import { getStripe } from './billing.controller.js';
 
 export const getPublicInvoice = async (req, res) => {
     const { token } = req.params;
@@ -51,5 +52,48 @@ export const getPublicInvoice = async (req, res) => {
     } catch (err) {
         console.error('[publicInvoice]', err.message);
         res.status(500).json({ message: 'Error interno' });
+    }
+};
+
+// POST /api/public/invoice/:token/checkout — crea una sesión de pago de Stripe
+// para el importe pendiente de la factura. Sin autenticación: el token público
+// (32+ caracteres aleatorios) es la única credencial, igual que getPublicInvoice.
+export const createPublicInvoiceCheckout = async (req, res) => {
+    const { token } = req.params;
+    if (!token || token.length < 32) return res.status(400).json({ message: 'Token no válido' });
+
+    try {
+        const [[invoice]] = await pool.query(
+            `SELECT id, invoice_number, total_amount, paid_amount, payment_status
+             FROM invoices WHERE public_token = ? AND is_deleted = 0`,
+            [token]
+        );
+        if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
+        if (invoice.payment_status === 'paid') return res.status(400).json({ message: 'Esta factura ya está pagada' });
+
+        const pending = Math.round((Number(invoice.total_amount) - Number(invoice.paid_amount)) * 100) / 100;
+        if (!(pending > 0)) return res.status(400).json({ message: 'No hay importe pendiente de cobro' });
+
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: 'eur',
+                    product_data: { name: `Factura ${invoice.invoice_number}` },
+                    unit_amount: Math.round(pending * 100),
+                },
+                quantity: 1,
+            }],
+            success_url: `${process.env.FRONTEND_URL}/p/${token}?payment=success`,
+            cancel_url:  `${process.env.FRONTEND_URL}/p/${token}?payment=cancelled`,
+            metadata: { type: 'invoice_payment', invoice_id: String(invoice.id), public_token: token },
+        });
+
+        res.json({ url: session.url });
+    } catch (err) {
+        console.error('[publicInvoiceCheckout]', err.message);
+        res.status(500).json({ message: err.message.includes('STRIPE_SECRET_KEY') ? 'El cobro online no está disponible ahora mismo.' : 'Error al iniciar el pago' });
     }
 };

@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { pool } from '../config/db.js';
 import { PLANS } from '../config/plans.js';
 
-const getStripe = () => {
+export const getStripe = () => {
     if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY no configurada');
     return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' });
 };
@@ -130,6 +130,11 @@ export const stripeWebhook = async (req, res) => {
         switch (event.type) {
 
             case 'checkout.session.completed': {
+                // Pago de una factura desde el enlace público — no toca la suscripción del usuario
+                if (data.metadata?.type === 'invoice_payment') {
+                    await recordInvoicePayment(data, event.id);
+                    break;
+                }
                 const userId = data.metadata?.workly_user_id;
                 const plan   = data.metadata?.plan;
                 if (!userId || !plan) break;
@@ -215,6 +220,51 @@ const logBillingEvent = async (userId, stripeEventId, type, amount, status) => {
             [userId, stripeEventId, type, amount, status]
         );
     } catch { /* ignorar duplicados */ }
+};
+
+// Registra el cobro de una factura pagada desde el enlace público (checkout.session.completed
+// con metadata.type === 'invoice_payment'). Idempotente frente a reintentos del webhook de
+// Stripe: comprueba que no exista ya un pago con la misma referencia (session.id).
+const recordInvoicePayment = async (session, stripeEventId) => {
+    const invoiceId = session.metadata?.invoice_id;
+    if (!invoiceId) return;
+
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        const [[existing]] = await conn.query(
+            `SELECT id FROM invoice_payments WHERE invoice_id = ? AND reference = ?`, [invoiceId, session.id]
+        );
+        if (existing) { await conn.commit(); return; } // ya procesado (reintento del webhook)
+
+        const [[invoice]] = await conn.query(
+            `SELECT id, user_id, total_amount, paid_amount FROM invoices WHERE id = ? AND is_deleted = 0`, [invoiceId]
+        );
+        if (!invoice) { await conn.rollback(); return; }
+
+        const amountPaid = (session.amount_total || 0) / 100;
+        const newPaid     = Number(invoice.paid_amount) + amountPaid;
+        const payStatus   = newPaid >= Number(invoice.total_amount) ? 'paid' : 'partial';
+
+        await conn.query(
+            `INSERT INTO invoice_payments (invoice_id, user_id, amount, payment_date, method, reference, notes)
+             VALUES (?, ?, ?, CURDATE(), 'card', ?, 'Pago online desde el enlace público de la factura')`,
+            [invoiceId, invoice.user_id, amountPaid, session.id]
+        );
+        await conn.query(
+            `UPDATE invoices SET paid_amount=?, payment_status=?, status=?, paid_at=? WHERE id=?`,
+            [newPaid, payStatus, payStatus === 'paid' ? 'paid' : 'sent', payStatus === 'paid' ? new Date() : null, invoiceId]
+        );
+
+        await conn.commit();
+        await logBillingEvent(invoice.user_id, stripeEventId, 'invoice_payment', amountPaid, 'paid');
+    } catch (err) {
+        await conn.rollback();
+        console.error('[Webhook] Error registrando pago de factura:', err.message);
+    } finally {
+        conn.release();
+    }
 };
 
 const getPlanFromSubscription = async (subscription) => {

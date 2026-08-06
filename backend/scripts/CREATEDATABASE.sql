@@ -543,6 +543,57 @@ CREATE TABLE IF NOT EXISTS time_entries (
 );
 
 -- ══════════════════════════════════════════════════════════
+-- NOTIFICATIONS (persistentes, con estado leído/no leído)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS notifications (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NOT NULL,
+
+  type         ENUM('overdue','warning','info') NOT NULL DEFAULT 'info',
+  entity_type  VARCHAR(30) NOT NULL,
+  entity_id    INT NOT NULL,
+
+  title        VARCHAR(150) NOT NULL,
+  body         VARCHAR(255),
+  link         VARCHAR(255),
+  is_read      TINYINT(1) DEFAULT 0,
+
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_notifications_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+
+  UNIQUE KEY uq_notification_source (user_id, entity_type, entity_id, type)
+);
+
+-- ══════════════════════════════════════════════════════════
+-- RECURRING EXPENSES (alquiler, SaaS, etc. — se generan solos)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS recurring_expenses (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT NOT NULL,
+  company_id    INT DEFAULT NULL,
+
+  category      VARCHAR(100),
+  description   VARCHAR(255),
+  amount        DECIMAL(10,2) NOT NULL,
+
+  frequency     ENUM('weekly','monthly','quarterly','yearly') NOT NULL DEFAULT 'monthly',
+  next_date     DATE NOT NULL,
+  end_date      DATE DEFAULT NULL,
+  status        ENUM('active','paused','finished') NOT NULL DEFAULT 'active',
+  last_generated DATETIME DEFAULT NULL,
+
+  is_deleted    TINYINT(1) DEFAULT 0,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_recurring_expenses_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_recurring_expenses_company
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+);
+
+-- ══════════════════════════════════════════════════════════
 -- ÍNDICES para mejorar rendimiento
 -- ══════════════════════════════════════════════════════════
 CREATE INDEX idx_invoices_user       ON invoices(user_id);
@@ -559,6 +610,8 @@ CREATE INDEX idx_tasks_project       ON tasks(project_id);
 CREATE INDEX idx_tasks_user          ON tasks(user_id);
 CREATE INDEX idx_time_entries_user   ON time_entries(user_id);
 CREATE INDEX idx_time_entries_active ON time_entries(user_id, stopped_at);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read);
+CREATE INDEX idx_recurring_expenses_next   ON recurring_expenses(next_date, status);
 
 SET FOREIGN_KEY_CHECKS = 1;
 

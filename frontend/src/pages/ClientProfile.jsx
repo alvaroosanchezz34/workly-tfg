@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, NavLink } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getClientProfile } from '../api/clients';
@@ -45,14 +45,14 @@ export default function ClientProfile() {
     const [tab,      setTab]     = useState('resumen');
     const [editing,  setEditing] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setData(await getClientProfile(token, id)); }
         catch { navigate('/clients'); }
         finally { setLoading(false); }
-    };
+    }, [token, id, navigate]);
 
-    useEffect(() => { if (token) load(); }, [token, id]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleEdit = async form => {
         await updateClient(token, id, form);

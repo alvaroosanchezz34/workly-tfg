@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getDeletedClients, restoreClient } from '../api/clients';
 import Sidebar from '../components/Sidebar';
@@ -19,13 +19,13 @@ export default function DeletedClients() {
     const [restoring, setRestoring] = useState(null);
     const navigate = useNavigate();
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setClients(await getDeletedClients(token)); }
         finally { setLoading(false); }
-    };
+    }, [token]);
 
-    useEffect(() => { if (token) load(); }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleRestore = async id => {
         setRestoring(id);

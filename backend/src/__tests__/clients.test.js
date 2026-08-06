@@ -218,3 +218,49 @@ describe('Clients - PUT /api/clients/:id/restore', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Clients - POST /api/clients/bulk-delete', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('200 - elimina varios clientes', async () => {
+    mockQuery
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const res = await request(app).post('/api/clients/bulk-delete').set(AUTH_HEADER).send({ ids: [1, 2] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.deleted).toBe(2);
+  });
+
+  test('400 - sin ids', async () => {
+    mockQuery.mockResolvedValueOnce(USER);
+    const res = await request(app).post('/api/clients/bulk-delete').set(AUTH_HEADER).send({ ids: [] });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Clients - POST /api/clients/import', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('201 - importa filas válidas y omite las sin nombre', async () => {
+    mockQuery
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([{ insertId: 1 }]); // solo la fila con nombre
+
+    const res = await request(app).post('/api/clients/import').set(AUTH_HEADER).send({
+      rows: [{ name: 'Cliente A', email: 'a@test.com' }, { name: '' }],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(1);
+    expect(res.body.invalid).toBe(1);
+  });
+
+  test('400 - sin filas', async () => {
+    mockQuery.mockResolvedValueOnce(USER);
+    const res = await request(app).post('/api/clients/import').set(AUTH_HEADER).send({ rows: [] });
+    expect(res.status).toBe(400);
+  });
+});

@@ -2,7 +2,7 @@ import express from 'express';
 import {
     createClient, getClients, getClientById,
     updateClient, deleteClient, getDeletedClients, restoreClient,
-    getClientProfile,
+    getClientProfile, bulkDeleteClients, importClients,
 } from '../controllers/clients.controller.js';
 import { authenticate }  from '../middlewares/auth.middleware.js';
 import { checkLimit }    from '../middlewares/plan.middleware.js';
@@ -12,6 +12,8 @@ const router = express.Router();
 router.get('/deleted',       authenticate, getDeletedClients);
 router.put('/:id/restore',   authenticate, restoreClient);
 router.get('/:id/profile',   authenticate, getClientProfile);   // mini-CRM
+router.post('/bulk-delete',  authenticate, bulkDeleteClients);
+router.post('/import',       authenticate, importClients);
 
 router.get('/',    authenticate, getClients);
 router.post('/',   authenticate, checkLimit('clients'), createClient);  // Free: máx 5

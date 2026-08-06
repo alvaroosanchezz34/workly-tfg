@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UIProvider, UIContext } from './context/UIContext';
 import { useContext, useState, useEffect, lazy, Suspense } from 'react';
@@ -48,26 +48,35 @@ const PrivateRoute = ({ children }) => {
 
 const NotifPanel = () => {
     const { token } = useContext(AuthContext);
-    const { notifOpen, closeNotif, notifications, markAllRead } = useContext(UIContext);
+    const { notifOpen, closeNotif, notifications, markAllRead, markRead } = useContext(UIContext);
+    const navigate = useNavigate();
     if (!notifOpen || !token) return null;
     const COLOR = { overdue: '#F44336', warning: '#FF9800', info: '#1976D2' };
+
+    const openNotif = n => {
+        if (!n.is_read) markRead(n.id);
+        closeNotif();
+        if (n.link) navigate(n.link);
+    };
+
     return (
         <div style={{ position: 'fixed', bottom: 80, left: 270, width: 320, background: 'var(--card-bg, #fff)', border: '1.5px solid var(--border, #E0E0E0)', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 9999, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border, #E0E0E0)' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>Notificaciones</span>
                 <div style={{ display: 'flex', gap: 10 }}>
-                    {notifications.some(n => !n.read) && <button onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#1976D2' }}>Marcar leído</button>}
-                    <button onClick={closeNotif} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#999', lineHeight: 1 }}>×</button>
+                    {notifications.some(n => !n.is_read) && <button onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#1976D2' }}>Marcar leído</button>}
+                    <button onClick={closeNotif} aria-label="Cerrar notificaciones" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#999', lineHeight: 1 }}>×</button>
                 </div>
             </div>
             <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                 {notifications.length === 0
                     ? <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9E9E9E', fontSize: 13 }}>✓ Todo al día</div>
                     : notifications.map(n => (
-                        <div key={n.id} style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border, #F0F0F0)', background: n.read ? 'transparent' : 'rgba(25,118,210,0.04)' }}>
+                        <div key={n.id} onClick={() => openNotif(n)} role="button" tabIndex={0}
+                            style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border, #F0F0F0)', background: n.is_read ? 'transparent' : 'rgba(25,118,210,0.04)', cursor: n.link ? 'pointer' : 'default' }}>
                             <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLOR[n.type] || '#1976D2', flexShrink: 0, marginTop: 5 }} />
                             <div>
-                                <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
+                                <div style={{ fontSize: 13, fontWeight: n.is_read ? 400 : 600 }}>{n.title}</div>
                                 <div style={{ fontSize: 12, color: '#616161', marginTop: 2 }}>{n.body}</div>
                             </div>
                         </div>
@@ -100,7 +109,7 @@ const OnboardingWrapper = () => {
             const t = setTimeout(() => setShow(true), 1200);
             return () => clearTimeout(t);
         }
-    }, [token, isAuthenticated, location.pathname]);
+    }, [token, isAuthenticated, location.pathname, isPublic]);
 
     const close = () => { setShow(false); localStorage.setItem('workly_onboarding_dismissed', '1'); };
     if (!show) return null;

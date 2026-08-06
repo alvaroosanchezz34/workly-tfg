@@ -2,6 +2,7 @@ import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
 import { getPagination, paginatedResponse } from '../utils/paginate.js';
 import { resourceScope } from '../utils/scope.js';
+import { getLimit } from '../config/plans.js';
 
 // Crear cliente
 export const createClient = async (req, res) => {
@@ -152,6 +153,31 @@ export const deleteClient = async (req, res) => {
     }
 };
 
+// Eliminar varios clientes a la vez (SOFT DELETE)
+export const bulkDeleteClients = async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'Selecciona al menos un cliente' });
+    if (ids.length > 200) return res.status(400).json({ message: 'Máximo 200 clientes por operación' });
+
+    try {
+        const scope = resourceScope(req);
+        let deleted = 0;
+        for (const id of ids) {
+            const [result] = await pool.query(
+                `UPDATE clients SET is_deleted=1, deleted_at=NOW(), deleted_by=? WHERE id=? AND ${scope.where} AND is_deleted=0`,
+                [req.user.id, id, ...scope.params]
+            );
+            if (result.affectedRows > 0) {
+                await logActivity({ userId: req.user.id, entity: 'client', entityId: id, action: 'deleted' });
+                deleted++;
+            }
+        }
+        res.json({ message: `${deleted} cliente(s) eliminado(s)`, deleted, skipped: ids.length - deleted });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // Obtener clientes eliminados
 export const getDeletedClients = async (req, res) => {
     try {
@@ -267,6 +293,51 @@ export const getClientProfile = async (req, res) => {
         };
 
         res.json({ client, invoices, projects, kpis });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Importar clientes desde CSV (ya parseado a objetos por el frontend)
+// body: { rows: [{ name, email, phone, company, document, notes }, ...] }
+export const importClients = async (req, res) => {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ message: 'No hay filas para importar' });
+    if (rows.length > 500) return res.status(400).json({ message: 'Máximo 500 filas por importación' });
+
+    try {
+        const limit = getLimit(req.user, 'clients');
+        let allowed = rows;
+        let overLimit = 0;
+        if (limit !== -1) {
+            const [[{ cnt }]] = await pool.query(
+                `SELECT COUNT(*) AS cnt FROM clients WHERE user_id = ? AND is_deleted = 0`, [req.user.id]
+            );
+            const remaining = Math.max(0, limit - cnt);
+            allowed = rows.slice(0, remaining);
+            overLimit = rows.length - allowed.length;
+        }
+
+        let imported = 0, invalid = 0;
+        for (const row of allowed) {
+            const name = (row.name || row.nombre || '').trim();
+            if (!name) { invalid++; continue; }
+            await pool.query(
+                `INSERT INTO clients (user_id, company_id, name, email, phone, company, notes, document)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [req.user.id, req.user.company_id || null, name,
+                 row.email || null, row.phone || row.telefono || null, row.company || row.empresa || null,
+                 row.notes || row.notas || null, row.document || row.dni || row.nif || null]
+            );
+            imported++;
+        }
+
+        res.status(201).json({
+            message: `${imported} cliente(s) importado(s)` +
+                (invalid ? `, ${invalid} fila(s) sin nombre omitida(s)` : '') +
+                (overLimit ? `, ${overLimit} fila(s) omitida(s) por el límite del plan Free` : ''),
+            imported, invalid, overLimit,
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

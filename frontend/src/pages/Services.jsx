@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getServices, createService, updateService, deleteService } from '../api/services';
 import Sidebar from '../components/Sidebar';
@@ -18,15 +18,15 @@ export default function Services() {
     const [editing,  setEditing]  = useState(null);
     const [toDelete, setToDelete] = useState(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         setError('');
         try { setServices(await getServices(token)); }
         catch { setError('No se pudieron cargar los servicios.'); }
         finally { setLoading(false); }
-    };
+    }, [token]);
 
-    useEffect(() => { if (token) load(); }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleCreate = async f => { await createService(token, f); setShowForm(false); load(); };
     const handleEdit   = async f => { await updateService(token, editing.id, f); setEditing(null); load(); };
@@ -68,6 +68,7 @@ export default function Services() {
                             className="form-input"
                             style={{ paddingLeft: 34 }}
                             placeholder="Buscar servicio por nombre o unidad…"
+                            aria-label="Buscar servicios"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                         />

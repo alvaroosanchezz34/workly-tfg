@@ -53,6 +53,9 @@ export default function ActivityLogs() {
         finally { setLoading(false); }
     }, [token, entityFilter]);
 
+    // `load` se excluye a propósito: su identidad cambia con entityFilter y los
+    // filtros ya disparan load() explícitamente vía handleEntity/handlePage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { load(1,''); }, [token]);
 
     const handlePage   = p => { load(p, entityFilter); };

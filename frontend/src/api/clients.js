@@ -36,3 +36,13 @@ export const getClientProfile = async (token, id) => {
     if (!res.ok) throw new Error('Error al cargar perfil del cliente');
     return res.json();
 };
+export const bulkDeleteClients = async (token, ids) => {
+    const res = await fetchWithAuth(`${API}/clients/bulk-delete`, token, { method: 'POST', body: JSON.stringify({ ids }) });
+    if (!res.ok) throw new Error('Error al eliminar clientes');
+    return res.json();
+};
+export const importClients = async (token, rows) => {
+    const res = await fetchWithAuth(`${API}/clients/import`, token, { method: 'POST', body: JSON.stringify({ rows }) });
+    if (!res.ok) throw new Error('Error al importar clientes');
+    return res.json();
+};

@@ -23,7 +23,7 @@ export default function UpgradeModal({ feature, message, onClose }) {
 
                 {/* Header */}
                 <div style={{ background: 'linear-gradient(135deg,#1976D2,#0288D1)', padding: '28px 28px 24px', position: 'relative' }}>
-                    <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                    <button onClick={onClose} aria-label="Cerrar" style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
                         <X size={14} />
                     </button>
                     <div style={{ width: 48, height: 48, background: 'rgba(255,255,255,0.15)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>

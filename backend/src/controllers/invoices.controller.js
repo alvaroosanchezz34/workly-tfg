@@ -157,6 +157,69 @@ export const softDeleteInvoice = async (req, res) => {
     finally { conn.release(); }
 };
 
+// POST /api/invoices/bulk-delete  body: { ids: [1,2,3] }
+export const bulkDeleteInvoices = async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'Selecciona al menos una factura' });
+    if (ids.length > 200) return res.status(400).json({ message: 'Máximo 200 facturas por operación' });
+
+    const scope = resourceScope(req);
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        let deleted = 0, skipped = 0;
+        for (const id of ids) {
+            const [[invoice]] = await conn.query(`SELECT payment_status FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
+            if (!invoice || invoice.payment_status === 'paid') { skipped++; continue; }
+            await conn.query(`UPDATE invoices SET is_deleted=1, deleted_at=NOW(), deleted_by=? WHERE id=?`, [req.user.id, id]);
+            await conn.query(`UPDATE invoice_items SET is_deleted=1 WHERE invoice_id=?`, [id]);
+            await logActivity({ userId: req.user.id, entity: 'invoice', entityId: id, action: 'deleted' });
+            deleted++;
+        }
+        await conn.commit();
+        res.json({
+            message: `${deleted} factura(s) eliminada(s)` + (skipped ? `, ${skipped} omitida(s) (pagadas o no encontradas)` : ''),
+            deleted, skipped,
+        });
+    } catch (err) { await conn.rollback(); res.status(500).json({ message: err.message }); }
+    finally { conn.release(); }
+};
+
+// POST /api/invoices/bulk-status  body: { ids: [1,2,3], status: 'sent' }
+export const bulkUpdateInvoiceStatus = async (req, res) => {
+    const { ids, status } = req.body;
+    if (!['draft', 'sent', 'paid', 'overdue'].includes(status)) return res.status(400).json({ message: 'Estado no válido' });
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'Selecciona al menos una factura' });
+    if (ids.length > 200) return res.status(400).json({ message: 'Máximo 200 facturas por operación' });
+
+    const scope = resourceScope(req);
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        let updated = 0, skipped = 0;
+        for (const id of ids) {
+            const [[inv]] = await conn.query(`SELECT total_amount, paid_amount FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
+            if (!inv) { skipped++; continue; }
+
+            if (status === 'paid') {
+                await conn.query(
+                    `UPDATE invoices SET status=?, paid_amount=total_amount, payment_status='paid', paid_at=NOW() WHERE id=?`,
+                    [status, id]
+                );
+            } else {
+                const total = Number(inv.total_amount) || 0;
+                const paid  = Number(inv.paid_amount) || 0;
+                const paymentStatus = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial';
+                await conn.query(`UPDATE invoices SET status=?, payment_status=? WHERE id=?`, [status, paymentStatus, id]);
+            }
+            updated++;
+        }
+        await conn.commit();
+        res.json({ message: `${updated} factura(s) actualizada(s)` + (skipped ? `, ${skipped} no encontrada(s)` : ''), updated, skipped });
+    } catch (err) { await conn.rollback(); res.status(500).json({ message: err.message }); }
+    finally { conn.release(); }
+};
+
 export const updateInvoiceStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;

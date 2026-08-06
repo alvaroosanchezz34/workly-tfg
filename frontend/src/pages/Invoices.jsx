@@ -1,27 +1,31 @@
 // frontend/src/pages/Invoices.jsx
-import { useContext, useEffect, useState, useCallback } from 'react';
+import { useContext, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import InvoiceForm from '../components/InvoiceForm';
-import InvoiceStatsPanel from '../components/invoice/InvoiceStatsPanel';
 import InvoiceFilters from '../components/invoice/InvoiceFilters';
-import InvoicePaymentsModal from '../components/invoice/InvoicePaymentsModal';
-import QuotesTab from '../components/invoice/QuotesTab';
-import RecurringTab from '../components/invoice/RecurringTab';
-import CreditNotesTab from '../components/invoice/CreditNotesTab';
-import InvoiceSettingsModal from '../components/invoice/InvoiceSettingsModal';
+import Pagination from '../components/Pagination';
+import useIsMobile from '../hooks/useIsMobile';
+
+// Cargados bajo demanda: solo se montan al abrir su pestaña/modal, y
+// InvoiceStatsPanel arrastra recharts, el mayor peso de esta página.
+const InvoiceStatsPanel    = lazy(() => import('../components/invoice/InvoiceStatsPanel'));
+const InvoicePaymentsModal = lazy(() => import('../components/invoice/InvoicePaymentsModal'));
+const QuotesTab            = lazy(() => import('../components/invoice/QuotesTab'));
+const RecurringTab         = lazy(() => import('../components/invoice/RecurringTab'));
+const CreditNotesTab       = lazy(() => import('../components/invoice/CreditNotesTab'));
+const InvoiceSettingsModal = lazy(() => import('../components/invoice/InvoiceSettingsModal'));
+
 import {
     getInvoices, getInvoiceById, createInvoice, updateInvoice,
     deleteInvoice, downloadInvoicePDF, updateInvoiceStatus, getInvoiceStats,
-    sendInvoiceByEmail,
+    sendInvoiceByEmail, bulkDeleteInvoices, bulkUpdateInvoiceStatus,
 } from '../api/invoices';
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
 import { getServices } from '../api/services';
 import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown, Send, Mail } from 'lucide-react';
-import Pagination from '../components/Pagination';
-import useIsMobile from '../hooks/useIsMobile';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -183,6 +187,8 @@ export default function Invoices() {
     const [sendEmail,    setSendEmail]    = useState('');
     const [sending,      setSending]      = useState(false);
     const [sendOk,       setSendOk]       = useState('');
+    const [selectedIds,  setSelectedIds]  = useState([]);
+    const [bulkBusy,     setBulkBusy]     = useState(false);
 
     const [filters, setFilters] = useState({
         status: '', client_id: '', date_from: '', date_to: '', min_amount: '', max_amount: '',
@@ -202,11 +208,12 @@ export default function Invoices() {
             if (inv?.pagination) setPagination(inv.pagination);
             setClients(Array.isArray(cli) ? cli : (cli?.data ?? []));
             setProjects(proj); setServices(svc);
+            setSelectedIds([]);
         } catch { setError('No se pudieron cargar las facturas.'); }
         finally { setLoading(false); }
     }, [token, filters, page]);
 
-    useEffect(() => { if (token) load(); }, [load]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     // Volver a la página 1 cuando cambian los filtros
     useEffect(() => { setPage(1); }, [filters]);
@@ -221,6 +228,20 @@ export default function Invoices() {
     const handleDelete = async () => { await deleteInvoice(token, toDelete.id); setToDelete(null); load(); };
     const closeForm    = () => { setShowForm(false); setEditing(null); };
     const handleStatusChange = async (id, status) => { await updateInvoiceStatus(token, id, status); load(); };
+
+    const toggleSelect = id => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+    const toggleSelectAll = () => setSelectedIds(ids => ids.length === invoices.length ? [] : invoices.map(i => i.id));
+    const handleBulkDelete = async () => {
+        if (!confirm(`¿Eliminar ${selectedIds.length} factura(s)? Las facturas pagadas se omitirán.`)) return;
+        setBulkBusy(true);
+        try { const res = await bulkDeleteInvoices(token, selectedIds); alert(res.message); load(); }
+        finally { setBulkBusy(false); }
+    };
+    const handleBulkStatus = async status => {
+        setBulkBusy(true);
+        try { const res = await bulkUpdateInvoiceStatus(token, selectedIds, status); alert(res.message); load(); }
+        finally { setBulkBusy(false); }
+    };
     const handleDownload = async inv => {
         setDownloading(inv.id);
         try { await downloadInvoicePDF(token, inv.id); }
@@ -297,6 +318,18 @@ export default function Invoices() {
                             onReset={() => setFilters({ status:'', client_id:'', date_from:'', date_to:'', min_amount:'', max_amount:'' })}
                         />
 
+                        {selectedIds.length > 0 && !isMobile && (
+                            <div style={{ display:'flex', alignItems:'center', gap:10, background:'var(--primary-light)', border:'1px solid var(--primary)', borderRadius:8, padding:'8px 14px', marginBottom:14, flexWrap:'wrap' }}>
+                                <span style={{ fontSize:13, fontWeight:600, color:'var(--primary)' }}>{selectedIds.length} seleccionada{selectedIds.length !== 1 ? 's' : ''}</span>
+                                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginLeft:'auto' }}>
+                                    <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => handleBulkStatus('sent')}>Marcar enviada</button>
+                                    <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => handleBulkStatus('paid')}>Marcar pagada</button>
+                                    <button className="btn btn-danger btn-sm" disabled={bulkBusy} onClick={handleBulkDelete}>Eliminar</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
                         {loading ? (
                             <div className="table-wrap">
                                 {[...Array(5)].map((_,i) => (
@@ -369,6 +402,11 @@ export default function Invoices() {
                                 <table className="data-table">
                                     <thead>
                                         <tr>
+                                            <th style={{ width:32 }}>
+                                                <input type="checkbox" aria-label="Seleccionar todas"
+                                                    checked={selectedIds.length === invoices.length && invoices.length > 0}
+                                                    onChange={toggleSelectAll} />
+                                            </th>
                                             <th>Número</th><th>Cliente</th><th>Estado</th><th>Cobro</th>
                                             <th>Emisión</th><th>Vencimiento</th>
                                             <th style={{ textAlign:'right' }}>Base</th>
@@ -383,6 +421,11 @@ export default function Invoices() {
                                             const payMeta   = PAY_STATUS[inv.payment_status] || PAY_STATUS.unpaid;
                                             return (
                                                 <tr key={inv.id} style={{ animationDelay:`${idx*18}ms` }}>
+                                                    <td>
+                                                        <input type="checkbox" aria-label={`Seleccionar factura ${inv.invoice_number}`}
+                                                            checked={selectedIds.includes(inv.id)}
+                                                            onChange={() => toggleSelect(inv.id)} />
+                                                    </td>
                                                     <td>
                                                         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                                                             <div style={{ width:28, height:28, borderRadius:6, background:'var(--primary-light)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -423,9 +466,11 @@ export default function Invoices() {
                     </>
                 )}
 
-                {tab==='presupuestos'  && <QuotesTab     token={token} clients={clients} projects={projects} services={services}/>}
-                {tab==='recurrentes'   && <RecurringTab   token={token} clients={clients} projects={projects} services={services} onProcessed={load}/>}
-                {tab==='notas-credito' && <CreditNotesTab token={token} invoices={invoices}/>}
+                <Suspense fallback={<div className="table-wrap" style={{ padding: 24 }}><div className="skeleton" style={{ height: 12, width: '30%' }} /></div>}>
+                    {tab==='presupuestos'  && <QuotesTab     token={token} clients={clients} projects={projects} services={services}/>}
+                    {tab==='recurrentes'   && <RecurringTab   token={token} clients={clients} projects={projects} services={services} onProcessed={load}/>}
+                    {tab==='notas-credito' && <CreditNotesTab token={token} invoices={invoices}/>}
+                </Suspense>
 
             </main>
 
@@ -448,9 +493,11 @@ export default function Invoices() {
                 </div>
             </Modal>
 
-            {paymentsInv && <InvoicePaymentsModal token={token} invoice={paymentsInv} onClose={() => { setPaymentsInv(null); load(); }}/>}
-            {showStats && stats && <InvoiceStatsPanel stats={stats} onClose={() => setShowStats(false)}/>}
-            {showSettings && <InvoiceSettingsModal token={token} onClose={() => setShowSettings(false)}/>}
+            <Suspense fallback={null}>
+                {paymentsInv && <InvoicePaymentsModal token={token} invoice={paymentsInv} onClose={() => { setPaymentsInv(null); load(); }}/>}
+                {showStats && stats && <InvoiceStatsPanel stats={stats} onClose={() => setShowStats(false)}/>}
+                {showSettings && <InvoiceSettingsModal token={token} onClose={() => setShowSettings(false)}/>}
+            </Suspense>
 
             {previewInv && (
                 <Modal open size="lg" title={`Vista previa — ${previewInv.invoice_number}`} onClose={() => setPreviewInv(null)}>

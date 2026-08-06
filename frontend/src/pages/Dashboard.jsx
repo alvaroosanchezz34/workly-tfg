@@ -1,10 +1,11 @@
 // frontend/src/pages/Dashboard.jsx
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, lazy, Suspense } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getDashboard } from '../api/dashboard';
 import Sidebar from '../components/Sidebar';
 import MetricCard from '../components/MetricCard';
-import ChartCard from '../components/ChartCard';
+// Diferido: arrastra chart.js/react-chartjs-2, la mayor parte del peso de esta página
+const ChartCard = lazy(() => import('../components/ChartCard'));
 import AlertBox from '../components/AlertBox';
 import QuickActions from '../components/QuickActions';
 import AISummaryWidget from '../components/ai/AISummaryWidget';
@@ -104,7 +105,11 @@ const Dashboard = () => {
                             style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:18, marginBottom:18 }}
                         >
                             {data?.monthlyIncome?.length > 0
-                                ? <ChartCard data={data.monthlyIncome} />
+                                ? (
+                                    <Suspense fallback={<div className="card card-p" style={{ minHeight: 200 }}><div className="skeleton" style={{ height: 160 }} /></div>}>
+                                        <ChartCard data={data.monthlyIncome} />
+                                    </Suspense>
+                                )
                                 : (
                                     <div className="card card-p" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:200 }}>
                                         <p style={{ color:'var(--text-disabled)', fontSize:13 }}>Sin datos de ingresos todavía</p>

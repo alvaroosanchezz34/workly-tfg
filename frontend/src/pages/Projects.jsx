@@ -1,5 +1,5 @@
 // frontend/src/pages/Projects.jsx
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -63,7 +63,7 @@ export default function Projects() {
     const [toDelete,     setToDelete]     = useState(null);
     const [dragging,     setDragging]     = useState(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
             const [p, c] = await Promise.all([getProjects(token), getClients(token)]);
@@ -71,8 +71,8 @@ export default function Projects() {
             setClients(Array.isArray(c) ? c : (c?.data??[]));
         } catch { setError('No se pudieron cargar los proyectos.'); }
         finally { setLoading(false); }
-    };
-    useEffect(() => { if (token) load(); }, [token]);
+    }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleCreate = async d => { await createProject(token, d); setShowForm(false); load(); };
     const handleEdit   = async d => { await updateProject(token, editing.id, d); setEditing(null); load(); };
@@ -126,7 +126,7 @@ export default function Projects() {
                 <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
                     <div className="search-bar" style={{ flex:'1 1 160px', minWidth:160 }}>
                         <Search size={14} className="search-bar-icon"/>
-                        <input className="form-input" style={{ paddingLeft:34 }} placeholder="Buscar…" value={search}
+                        <input className="form-input" style={{ paddingLeft:34 }} placeholder="Buscar…" aria-label="Buscar proyectos" value={search}
                             onChange={e => { setSearch(e.target.value); setPage(1); }} />
                     </div>
                     <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>

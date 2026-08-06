@@ -25,6 +25,8 @@ import { stripeWebhook, getPlans, getBillingStatus, createCheckout, createPortal
 import { authenticate } from './middlewares/auth.middleware.js';
 import tasksRoutes from './routes/tasks.routes.js';
 import timeTrackingRoutes from './routes/timeTracking.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
+import recurringExpensesRoutes from './routes/recurringExpenses.routes.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +81,8 @@ app.use('/api/public', publicInvoiceRoutes);  // sin autenticación
 app.use('/api/ai', aiRoutes);
 app.use('/api/projects/:projectId/tasks', tasksRoutes);
 app.use('/api/time', timeTrackingRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/recurring-expenses', recurringExpensesRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 

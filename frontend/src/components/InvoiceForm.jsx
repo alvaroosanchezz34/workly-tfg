@@ -54,15 +54,15 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
             {/* Cliente + Proyecto */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
-                    <label className="form-label">Cliente <span style={{ color: 'var(--error)', marginLeft: 3 }}>*</span></label>
-                    <select name="client_id" value={form.client_id} onChange={set} className="form-select" required>
+                    <label className="form-label" htmlFor="invoice_client_id">Cliente <span style={{ color: 'var(--error)', marginLeft: 3 }}>*</span></label>
+                    <select id="invoice_client_id" name="client_id" value={form.client_id} onChange={set} className="form-select" required>
                         <option value="">Selecciona un cliente</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
                 <div className="form-group">
-                    <label className="form-label">Proyecto (opcional)</label>
-                    <select name="project_id" value={form.project_id} onChange={set} className="form-select">
+                    <label className="form-label" htmlFor="invoice_project_id">Proyecto (opcional)</label>
+                    <select id="invoice_project_id" name="project_id" value={form.project_id} onChange={set} className="form-select">
                         <option value="">Sin proyecto</option>
                         {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
                     </select>
@@ -72,12 +72,12 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
             {/* Fechas + Estado */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div className="form-group">
-                    <label className="form-label">Fecha de emisión <span style={{ color: 'var(--error)', marginLeft: 3 }}>*</span></label>
-                    <input type="date" name="issue_date" value={form.issue_date} onChange={set} className="form-input" required />
+                    <label className="form-label" htmlFor="invoice_issue_date">Fecha de emisión <span style={{ color: 'var(--error)', marginLeft: 3 }}>*</span></label>
+                    <input id="invoice_issue_date" type="date" name="issue_date" value={form.issue_date} onChange={set} className="form-input" required />
                 </div>
                 <div className="form-group">
-                    <label className="form-label">Fecha de vencimiento</label>
-                    <input type="date" name="due_date" value={form.due_date} onChange={set} className="form-input" />
+                    <label className="form-label" htmlFor="invoice_due_date">Fecha de vencimiento</label>
+                    <input id="invoice_due_date" type="date" name="due_date" value={form.due_date} onChange={set} className="form-input" />
                 </div>
                 <Select label="Estado" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
             </div>

@@ -3,6 +3,17 @@ import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
 import { getPagination, paginatedResponse } from '../utils/paginate.js';
 import { resourceScope } from '../utils/scope.js';
+import { getLimit } from '../config/plans.js';
+
+// Acepta 'YYYY-MM-DD' o 'DD/MM/YYYY' (formato español habitual en CSV exportados de Excel)
+const normalizeDate = raw => {
+    if (!raw) return null;
+    const s = raw.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    return null;
+};
 
 // Crear gasto
 export const createExpense = async (req, res) => {
@@ -147,6 +158,51 @@ export const deleteExpense = async (req, res) => {
         });
 
         res.json({ message: 'Gasto eliminado correctamente' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Importar gastos desde CSV (ya parseado a objetos por el frontend)
+// body: { rows: [{ date, category, description, amount }, ...] }
+export const importExpenses = async (req, res) => {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ message: 'No hay filas para importar' });
+    if (rows.length > 500) return res.status(400).json({ message: 'Máximo 500 filas por importación' });
+
+    try {
+        const limit = getLimit(req.user, 'expenses');
+        let allowed = rows;
+        let overLimit = 0;
+        if (limit !== -1) {
+            const [[{ cnt }]] = await pool.query(
+                `SELECT COUNT(*) AS cnt FROM expenses WHERE user_id = ? AND is_deleted = 0`, [req.user.id]
+            );
+            const remaining = Math.max(0, limit - cnt);
+            allowed = rows.slice(0, remaining);
+            overLimit = rows.length - allowed.length;
+        }
+
+        let imported = 0, invalid = 0;
+        for (const row of allowed) {
+            const date   = normalizeDate(row.date || row.fecha);
+            const amount = Number(row.amount ?? row.importe ?? row.amount_eur);
+            if (!date || !(amount > 0)) { invalid++; continue; }
+            await pool.query(
+                `INSERT INTO expenses (user_id, company_id, category, description, amount, date)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [req.user.id, req.user.company_id || null, row.category || row.categoria || 'otros',
+                 row.description || row.descripcion || null, amount, date]
+            );
+            imported++;
+        }
+
+        res.status(201).json({
+            message: `${imported} gasto(s) importado(s)` +
+                (invalid ? `, ${invalid} fila(s) inválida(s) omitida(s) (fecha o importe incorrectos)` : '') +
+                (overLimit ? `, ${overLimit} fila(s) omitida(s) por el límite del plan Free` : ''),
+            imported, invalid, overLimit,
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

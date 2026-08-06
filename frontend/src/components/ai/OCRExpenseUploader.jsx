@@ -99,7 +99,7 @@ export default function OCRExpenseUploader({ onApply }) {
                                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>La IA extrae los datos automáticamente</div>
                                 </div>
                             </div>
-                            <button type="button" onClick={() => { setOpen(false); reset(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                            <button type="button" onClick={() => { setOpen(false); reset(); }} aria-label="Cerrar escáner de tickets" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                                 <X size={20} />
                             </button>
                         </div>
@@ -136,6 +136,7 @@ export default function OCRExpenseUploader({ onApply }) {
                                     <button
                                         type="button"
                                         onClick={reset}
+                                        aria-label="Quitar imagen"
                                         style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                     >
                                         <X size={14} color="#fff" />

@@ -3,8 +3,8 @@
 // Ruta: /p/:token  (añadir en App.jsx sin PrivateRoute)
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { CheckCircle, Clock, AlertTriangle, FileText, Download, Building2, Mail, Phone } from 'lucide-react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { CheckCircle, Clock, AlertTriangle, FileText, Download, Building2, Mail, Phone, CreditCard, XCircle } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -21,9 +21,13 @@ const STATUS = {
 
 export default function PublicInvoice() {
     const { token }  = useParams();
+    const [searchParams] = useSearchParams();
     const [data,     setData]    = useState(null);
     const [loading,  setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [paying,   setPaying]  = useState(false);
+    const [payError, setPayError] = useState('');
+    const paymentResult = searchParams.get('payment'); // 'success' | 'cancelled' | null
 
     useEffect(() => {
         fetch(`${API}/public/invoice/${token}`)
@@ -31,7 +35,20 @@ export default function PublicInvoice() {
             .then(setData)
             .catch(() => setNotFound(true))
             .finally(() => setLoading(false));
-    }, [token]);
+    }, [token, paymentResult]);
+
+    const handlePay = async () => {
+        setPaying(true); setPayError('');
+        try {
+            const res = await fetch(`${API}/public/invoice/${token}/checkout`, { method: 'POST' });
+            const body = await res.json();
+            if (!res.ok) throw new Error(body.message || 'Error al iniciar el pago');
+            window.location.href = body.url;
+        } catch (err) {
+            setPayError(err.message);
+            setPaying(false);
+        }
+    };
 
     if (loading) return (
         <div style={pageStyle}>
@@ -64,8 +81,10 @@ export default function PublicInvoice() {
         </div>
     );
 
-    const { invoice_number, issue_date, due_date, status, total_amount, notes, client, issuer, items } = data;
+    const { invoice_number, issue_date, due_date, status, total_amount, paid_amount, payment_status, notes, client, issuer, items } = data;
     const st = STATUS[status] || STATUS.sent;
+    const pending = Math.round((Number(total_amount) - Number(paid_amount || 0)) * 100) / 100;
+    const canPay = payment_status !== 'paid' && pending > 0;
 
     return (
         <div style={pageStyle}>
@@ -105,6 +124,21 @@ export default function PublicInvoice() {
 
                 {/* Cuerpo */}
                 <div style={{ padding: '28px 32px' }}>
+
+                    {paymentResult === 'success' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 10, padding: '14px 18px', marginBottom: 24 }}>
+                            <CheckCircle size={18} color="#2E7D32" />
+                            <span style={{ fontSize: 13.5, color: '#2E7D32', fontWeight: 600 }}>
+                                {payment_status === 'paid' ? '¡Pago recibido! Gracias.' : 'Pago recibido. Puede tardar unos segundos en reflejarse.'}
+                            </span>
+                        </div>
+                    )}
+                    {paymentResult === 'cancelled' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFF3E0', border: '1px solid #FFCC80', borderRadius: 10, padding: '14px 18px', marginBottom: 24 }}>
+                            <XCircle size={18} color="#E65100" />
+                            <span style={{ fontSize: 13.5, color: '#E65100', fontWeight: 600 }}>Pago cancelado. Puedes intentarlo de nuevo cuando quieras.</span>
+                        </div>
+                    )}
 
                     {/* Emisor → Cliente | Fechas */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
@@ -173,7 +207,7 @@ export default function PublicInvoice() {
                     </div>
 
                     {/* Total */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: notes ? 24 : 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12, marginBottom: notes ? 24 : 0 }}>
                         <div style={{
                             background: '#1976D2', borderRadius: 10,
                             padding: '14px 24px',
@@ -187,6 +221,28 @@ export default function PublicInvoice() {
                                 {fmt(total_amount)}
                             </div>
                         </div>
+
+                        {payment_status === 'paid' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#2E7D32', fontSize: 13, fontWeight: 700 }}>
+                                <CheckCircle size={15}/> Factura pagada
+                            </div>
+                        ) : canPay ? (
+                            <>
+                                {payError && <div style={{ fontSize: 12.5, color: '#C62828' }}>{payError}</div>}
+                                <button
+                                    onClick={handlePay}
+                                    disabled={paying}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        background: '#2E7D32', color: '#fff', border: 'none',
+                                        borderRadius: 10, padding: '12px 22px', fontSize: 14, fontWeight: 700,
+                                        cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1,
+                                    }}
+                                >
+                                    <CreditCard size={16}/> {paying ? 'Redirigiendo…' : `Pagar ${fmt(pending)} ahora`}
+                                </button>
+                            </>
+                        ) : null}
                     </div>
 
                     {/* Notas */}

@@ -51,7 +51,7 @@ export default function OnboardingChecklist({ onClose }) {
                             {allDone ? 'Ya dominas Workly.' : `${completed} de ${total} completados`}
                         </p>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                    <button onClick={onClose} aria-label="Cerrar guía de inicio" style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
                         <X size={14} />
                     </button>
                 </div>

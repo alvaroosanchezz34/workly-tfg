@@ -4,6 +4,7 @@ import {
     downloadInvoicePDF, updateInvoiceStatus, sendInvoiceByEmail,
     addPayment, getPayments, deletePayment,
     getInvoiceStats, getInvoiceSettings, updateInvoiceSettings,
+    bulkDeleteInvoices, bulkUpdateInvoiceStatus,
 } from '../controllers/invoices.controller.js';
 import { authenticate }               from '../middlewares/auth.middleware.js';
 import { checkLimit, requireFeature } from '../middlewares/plan.middleware.js';
@@ -15,6 +16,8 @@ router.post('/',        authenticate, checkLimit('invoices'), createInvoice);   
 router.get('/stats',    authenticate, requireFeature('stats'), getInvoiceStats);    // Pro+
 router.get('/settings', authenticate, getInvoiceSettings);
 router.put('/settings', authenticate, updateInvoiceSettings);
+router.post('/bulk-delete', authenticate, bulkDeleteInvoices);
+router.post('/bulk-status', authenticate, bulkUpdateInvoiceStatus);
 router.get('/:id',      authenticate, getInvoiceById);
 router.put('/:id',      authenticate, updateInvoice);
 router.delete('/:id',   authenticate, softDeleteInvoice);

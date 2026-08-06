@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
@@ -37,7 +37,8 @@ function MemberMenu({ member, currentUserId, onRole, onStatus, onRemove }) {
     return (
         <div style={{ position: 'relative', display: 'inline-block' }}>
             <button onClick={() => setOpen(v => !v)}
-                className="btn-icon" style={{ display: 'inline-flex' }}>
+                className="btn-icon" style={{ display: 'inline-flex' }}
+                aria-label="Más acciones" aria-haspopup="true" aria-expanded={open}>
                 <MoreVertical size={14} />
             </button>
             {open && (
@@ -104,7 +105,7 @@ export default function Team() {
     const [inviting, setInviting] = useState(false);
     const [inviteResult, setInviteResult] = useState(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
             const [m, d] = await Promise.all([
@@ -114,8 +115,8 @@ export default function Team() {
             setMembers(m); setDashboard(d);
         } catch { setError('No se pudo cargar el equipo.'); }
         finally { setLoading(false); }
-    };
-    useEffect(() => { if (token) load(); }, [token]);
+    }, [token, isCompanyAdmin]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleInvite = async e => {
         e.preventDefault();

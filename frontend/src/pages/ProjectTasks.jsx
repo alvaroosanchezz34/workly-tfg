@@ -1,5 +1,5 @@
 // frontend/src/pages/ProjectTasks.jsx
-import { useContext, useEffect, useState, useRef } from 'react';
+import { useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getTasks, createTask, updateTask, deleteTask, moveTask } from '../api/tasks';
@@ -160,6 +160,7 @@ function TaskCard({ task, onEdit, onDelete, dragHandlers, isDragging }) {
                 <button
                     type="button"
                     onClick={e => { e.stopPropagation(); onDelete(task); }}
+                    aria-label="Eliminar tarea"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', padding: 2, borderRadius: 4, display: 'flex', alignItems: 'center', opacity: 0.5 }}
                 >
                     <X size={12} />
@@ -361,7 +362,7 @@ export default function ProjectTasks() {
         };
     }, []);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
             const [t, projects] = await Promise.all([
@@ -377,9 +378,9 @@ export default function ProjectTasks() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [token, projectId]);
 
-    useEffect(() => { if (token && projectId) load(); }, [token, projectId]);
+    useEffect(() => { if (token && projectId) load(); }, [token, projectId, load]);
 
     const handleCreate = async data => {
         await createTask(token, projectId, data);

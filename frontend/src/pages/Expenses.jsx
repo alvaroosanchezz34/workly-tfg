@@ -1,16 +1,21 @@
 // frontend/src/pages/Expenses.jsx
-import { useContext, useEffect, useState, useCallback } from 'react';
+import { useContext, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { getExpenses, createExpense, updateExpense, deleteExpense } from '../api/expenses';
+import { getExpenses, createExpense, updateExpense, deleteExpense, importExpenses } from '../api/expenses';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
 import ExpenseForm from '../components/ExpenseForm';
 import Pagination from '../components/Pagination';
 import OCRExpenseUploader from '../components/ai/OCRExpenseUploader';
-import { Plus, TrendingDown, Search, Pencil, Trash2 } from 'lucide-react';
+import CSVImportModal from '../components/CSVImportModal';
+import { Plus, TrendingDown, Search, Pencil, Trash2, Upload } from 'lucide-react';
 import useIsMobile from '../hooks/useIsMobile';
 
+const RecurringExpensesTab = lazy(() => import('../components/RecurringExpensesTab'));
+
 const PAGE_SIZE = 20;
+const TABS = ['gastos', 'recurrentes'];
+const TAB_LABEL = { gastos: 'Gastos', recurrentes: 'Recurrentes' };
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -44,6 +49,8 @@ export default function Expenses() {
     const [showForm,   setShowForm]   = useState(false);
     const [editing,    setEditing]    = useState(null);
     const [toDelete,   setToDelete]   = useState(null);
+    const [tab,        setTab]        = useState('gastos');
+    const [showImport, setShowImport] = useState(false);
 
     const load = useCallback(async (p = 1, cat = catFilter) => {
         setLoading(true); setError('');
@@ -57,6 +64,9 @@ export default function Expenses() {
         finally { setLoading(false); }
     }, [token, catFilter]);
 
+    // `load`/`catFilter` se excluyen a propósito: el cambio de filtro ya
+    // dispara load() explícitamente, incluirlos aquí duplicaría la carga
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { if (token) load(1, catFilter); }, [token]);
 
     const handlePage   = p  => { setPage(p); load(p, catFilter); };
@@ -92,20 +102,46 @@ export default function Expenses() {
                     </div>
                     <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
                         <OCRExpenseUploader onApply={handleOCRApply} />
+                        <button className="btn btn-ghost" onClick={() => setShowImport(true)}>
+                            <Upload size={14}/> Importar CSV
+                        </button>
                         <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
                             <Plus size={15} /> Nuevo gasto
                         </button>
                     </div>
                 </div>
 
+                {/* TABS */}
+                <div style={{ display:'flex', borderBottom:'2px solid var(--border)', marginBottom:20, overflowX:'auto' }}>
+                    {TABS.map(t => (
+                        <button key={t} onClick={() => setTab(t)} style={{
+                            padding:'9px 14px', background:'none', border:'none', cursor:'pointer',
+                            fontSize:13, fontWeight: tab===t?600:400,
+                            color: tab===t?'var(--primary)':'var(--text-secondary)',
+                            borderBottom:`2px solid ${tab===t?'var(--primary)':'transparent'}`,
+                            marginBottom:-2, fontFamily:'Inter, sans-serif', whiteSpace:'nowrap', transition:'color .15s',
+                        }}>
+                            {TAB_LABEL[t]}
+                        </button>
+                    ))}
+                </div>
+
                 {error && <div className="alert alert-danger" style={{ marginBottom:16 }}>{error}</div>}
 
+                {tab === 'recurrentes' && (
+                    <Suspense fallback={<div className="table-wrap" style={{ padding: 24 }}><div className="skeleton" style={{ height: 12, width: '30%' }} /></div>}>
+                        <RecurringExpensesTab token={token} onProcessed={() => load(page, catFilter)} />
+                    </Suspense>
+                )}
+
+                {tab === 'gastos' && (
+                <>
                 {/* BUSCADOR + FILTROS */}
                 <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
                     <div className="search-bar" style={{ flex:'1 1 200px', minWidth:160 }}>
                         <Search size={14} className="search-bar-icon" />
                         <input className="form-input" style={{ paddingLeft:34 }}
-                            placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
+                            placeholder="Buscar…" aria-label="Buscar gastos" value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     {usedCats.length > 1 && (
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -198,6 +234,8 @@ export default function Expenses() {
                         <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} pageSize={pagination.pageSize} onPage={handlePage} />
                     </div>
                 )}
+                </>
+                )}
             </main>
 
             <Modal open={showForm || !!editing} size="lg" title={editing?.id ? 'Editar gasto' : 'Nuevo gasto'} onClose={closeModal}>
@@ -212,6 +250,17 @@ export default function Expenses() {
                     <button className="btn btn-danger" onClick={handleDelete}>Eliminar</button>
                 </div>
             </Modal>
+            <CSVImportModal
+                open={showImport}
+                onClose={() => { setShowImport(false); load(page, catFilter); }}
+                title="Importar gastos desde CSV"
+                hint="Columnas admitidas: date (YYYY-MM-DD o DD/MM/YYYY), category, description, amount (date y amount son obligatorias)."
+                columns={[
+                    { key: 'date', label: 'Fecha' }, { key: 'category', label: 'Categoría' },
+                    { key: 'description', label: 'Descripción' }, { key: 'amount', label: 'Importe' },
+                ]}
+                onImport={rows => importExpenses(token, rows)}
+            />
         </div>
     );
 }

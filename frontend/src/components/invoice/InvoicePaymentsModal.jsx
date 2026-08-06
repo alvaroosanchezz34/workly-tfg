@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Modal from '../Modal';
 import { getPayments, addPayment, deletePayment } from '../../api/invoices';
 import { Plus, Trash2 } from 'lucide-react';
@@ -21,13 +21,13 @@ export default function InvoicePaymentsModal({ token, invoice, onClose }) {
     const [form,     setForm]     = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], method: 'transfer', reference: '', notes: '' });
     const [saving,   setSaving]   = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setPayments(await getPayments(token, invoice.id)); }
         finally { setLoading(false); }
-    };
+    }, [token, invoice.id]);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
     const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 

@@ -13,7 +13,7 @@ export default function InvoiceSettingsModal({ token, onClose }) {
         getInvoiceSettings(token)
             .then(setCfg)
             .finally(() => setLoading(false));
-    }, []);
+    }, [token]);
 
     const set = e => {
         const val = e.target.type === 'checkbox' ? (e.target.checked ? 1 : 0) : e.target.value;

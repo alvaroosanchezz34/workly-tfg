@@ -80,7 +80,7 @@ export default function AISmartQuote({ clients = [], onApply }) {
                                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>IA analiza tu historial y sugiere el precio óptimo</div>
                                 </div>
                             </div>
-                            <button type="button" onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar presupuesto inteligente" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                                 <X size={20} />
                             </button>
                         </div>
@@ -88,15 +88,15 @@ export default function AISmartQuote({ clients = [], onApply }) {
                         {/* Form */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                             <div className="form-group">
-                                <label className="form-label">Cliente (opcional)</label>
-                                <select value={clientId} onChange={e => setClientId(e.target.value)} className="form-select">
+                                <label className="form-label" htmlFor="sq_client_id">Cliente (opcional)</label>
+                                <select id="sq_client_id" value={clientId} onChange={e => setClientId(e.target.value)} className="form-select">
                                     <option value="">Sin cliente específico</option>
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Tipo de proyecto</label>
-                                <select value={projectType} onChange={e => setProjectType(e.target.value)} className="form-select">
+                                <label className="form-label" htmlFor="sq_project_type">Tipo de proyecto</label>
+                                <select id="sq_project_type" value={projectType} onChange={e => setProjectType(e.target.value)} className="form-select">
                                     <option value="">Seleccionar tipo…</option>
                                     {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
@@ -104,8 +104,9 @@ export default function AISmartQuote({ clients = [], onApply }) {
                         </div>
 
                         <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label">Describe el proyecto <span style={{ color: 'var(--error)' }}>*</span></label>
+                            <label className="form-label" htmlFor="sq_description">Describe el proyecto <span style={{ color: 'var(--error)' }}>*</span></label>
                             <textarea
+                                id="sq_description"
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
                                 placeholder='Ej: "Tienda online para venta de ropa artesanal, con pasarela de pago, gestión de stock y panel de administración"'

@@ -1,5 +1,5 @@
 // frontend/src/components/invoice/RecurringTab.jsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Modal from '../Modal';
 import InvoiceItems from '../InvoiceItems';
 import { getRecurring, createRecurring, updateRecurringStatus, deleteRecurring } from '../../api/recurringInvoices';
@@ -78,12 +78,12 @@ export default function RecurringTab({ token, clients, projects, services, onPro
     const [loading,  setLoading]  = useState(true);
     const [showForm, setShowForm] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setList(await getRecurring(token)); }
         finally { setLoading(false); }
-    };
-    useEffect(() => { if (token) load(); }, [token]);
+    }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     // Notifica al padre (Invoices.jsx) para que refresque su lista de facturas,
     // ya que crear/pausar/eliminar una recurrente puede afectar a las próximas facturas generadas

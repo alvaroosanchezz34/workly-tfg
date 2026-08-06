@@ -26,6 +26,12 @@ export const deleteInvoice = (token, id) =>
 export const updateInvoiceStatus = (token, id, status) =>
     fetchWithAuth(`${BASE}/${id}/status`, token, { method: 'PATCH', body: JSON.stringify({ status }) }).then(r => r.json());
 
+export const bulkDeleteInvoices = (token, ids) =>
+    fetchWithAuth(`${BASE}/bulk-delete`, token, { method: 'POST', body: JSON.stringify({ ids }) }).then(r => r.json());
+
+export const bulkUpdateInvoiceStatus = (token, ids, status) =>
+    fetchWithAuth(`${BASE}/bulk-status`, token, { method: 'POST', body: JSON.stringify({ ids, status }) }).then(r => r.json());
+
 export const getPayments   = (token, id)            => fetchWithAuth(`${BASE}/${id}/payments`, token).then(r => r.json());
 export const addPayment    = (token, id, data)       => fetchWithAuth(`${BASE}/${id}/payments`, token, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
 export const deletePayment = (token, id, paymentId)  => fetchWithAuth(`${BASE}/${id}/payments/${paymentId}`, token, { method: 'DELETE' });

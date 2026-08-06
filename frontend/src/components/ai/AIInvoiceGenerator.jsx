@@ -98,7 +98,7 @@ export default function AIInvoiceGenerator({ onApply }) {
                                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Describe el trabajo y la IA crea las líneas</div>
                                 </div>
                             </div>
-                            <button type="button" onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar generador de líneas con IA" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                                 <X size={20} />
                             </button>
                         </div>

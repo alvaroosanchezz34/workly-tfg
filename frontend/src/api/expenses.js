@@ -34,3 +34,12 @@ export const deleteExpense = async (token, id) => {
     if (!res.ok) throw new Error('Error al eliminar gasto');
     return true;
 };
+
+export const importExpenses = async (token, rows) => {
+    const res = await fetchWithAuth(`${API_URL}/import`, token, {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+    });
+    if (!res.ok) throw new Error('Error al importar gastos');
+    return res.json();
+};

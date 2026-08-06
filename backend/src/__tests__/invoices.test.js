@@ -367,3 +367,59 @@ describe('Invoices - DELETE /api/invoices/:id', () => {
         expect(res.status).toBe(404);
     });
 });
+
+describe('Invoices - POST /api/invoices/bulk-delete', () => {
+    beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
+
+    test('200 - elimina las no pagadas y omite las pagadas', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+
+        mockConnection.query
+            .mockResolvedValueOnce([[{ payment_status: 'unpaid' }]]) // id 1: SELECT
+            .mockResolvedValueOnce([{}])                              // id 1: UPDATE invoices
+            .mockResolvedValueOnce([{}])                              // id 1: UPDATE invoice_items
+            .mockResolvedValueOnce([[{ payment_status: 'paid' }]]);   // id 2: SELECT (se omite)
+
+        const res = await request(app).post('/api/invoices/bulk-delete').set(AUTH).send({ ids: [1, 2] });
+
+        expect(res.status).toBe(200);
+        expect(res.body.deleted).toBe(1);
+        expect(res.body.skipped).toBe(1);
+    });
+
+    test('400 - sin ids', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+        const res = await request(app).post('/api/invoices/bulk-delete').set(AUTH).send({ ids: [] });
+        expect(res.status).toBe(400);
+    });
+
+    test('401 - sin auth', async () => {
+        const res = await request(app).post('/api/invoices/bulk-delete').send({ ids: [1] });
+        expect(res.status).toBe(401);
+    });
+});
+
+describe('Invoices - POST /api/invoices/bulk-status', () => {
+    beforeEach(() => { jest.clearAllMocks(); mockConnection.query.mockReset(); });
+
+    test('200 - actualiza el estado de varias facturas', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+
+        mockConnection.query
+            .mockResolvedValueOnce([[{ total_amount: 100, paid_amount: 0 }]]) // id 1
+            .mockResolvedValueOnce([{}])                                       // id 1: UPDATE
+            .mockResolvedValueOnce([[undefined]]);                             // id 2: no encontrada
+
+        const res = await request(app).post('/api/invoices/bulk-status').set(AUTH).send({ ids: [1, 2], status: 'sent' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.updated).toBe(1);
+        expect(res.body.skipped).toBe(1);
+    });
+
+    test('400 - estado no válido', async () => {
+        mockQuery.mockResolvedValueOnce(USER);
+        const res = await request(app).post('/api/invoices/bulk-status').set(AUTH).send({ ids: [1], status: 'bogus' });
+        expect(res.status).toBe(400);
+    });
+});

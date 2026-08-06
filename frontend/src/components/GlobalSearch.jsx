@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, FolderOpen, FileText, X } from 'lucide-react';
 import { fetchWithAuth } from '../context/fetchWithAuth';
@@ -55,6 +55,12 @@ export default function GlobalSearch({ token, onClose }) {
         return () => clearTimeout(t);
     }, [query, token]);
 
+    const go = useCallback(item => {
+        const meta = TYPE_META[item.type];
+        navigate(meta.path(item.id));
+        onClose();
+    }, [navigate, onClose]);
+
     // Navegar con teclado
     useEffect(() => {
         const handle = e => {
@@ -64,13 +70,7 @@ export default function GlobalSearch({ token, onClose }) {
         };
         window.addEventListener('keydown', handle);
         return () => window.removeEventListener('keydown', handle);
-    }, [results, active]);
-
-    const go = item => {
-        const meta = TYPE_META[item.type];
-        navigate(meta.path(item.id));
-        onClose();
-    };
+    }, [results, active, go]);
 
     return (
         <div className="global-search-backdrop" onClick={onClose}>
@@ -86,7 +86,7 @@ export default function GlobalSearch({ token, onClose }) {
                         onChange={e => setQuery(e.target.value)}
                     />
                     {query && (
-                        <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', display: 'flex' }}>
+                        <button onClick={() => setQuery('')} aria-label="Borrar búsqueda" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', display: 'flex' }}>
                             <X size={16} />
                         </button>
                     )}

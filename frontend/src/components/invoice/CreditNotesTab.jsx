@@ -1,5 +1,5 @@
 // frontend/src/components/invoice/CreditNotesTab.jsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Modal from '../Modal';
 import InvoiceItems from '../InvoiceItems';
 import { getCreditNotes, createCreditNote, issueCreditNote, deleteCreditNote } from '../../api/creditNotes';
@@ -56,12 +56,12 @@ export default function CreditNotesTab({ token, invoices }) {
     const [loading,  setLoading]  = useState(true);
     const [showForm, setShowForm] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setNotes(await getCreditNotes(token)); }
         finally { setLoading(false); }
-    };
-    useEffect(() => { if (token) load(); }, [token]);
+    }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleCreate = async data => { await createCreditNote(token, data); setShowForm(false); load(); };
     const handleIssue  = async id   => { if (!confirm('¿Emitir esta nota de crédito? No podrás editarla.')) return; await issueCreditNote(token, id); load(); };

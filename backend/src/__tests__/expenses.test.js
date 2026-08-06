@@ -178,3 +178,43 @@ describe('Expenses - DELETE /api/expenses/:id', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Expenses - POST /api/expenses/import', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('201 - importa filas válidas y omite inválidas', async () => {
+    mockQuery
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([{ insertId: 1 }]); // solo la fila válida
+
+    const res = await request(app).post('/api/expenses/import').set(AUTH).send({
+      rows: [
+        { date: '2026-01-15', category: 'software', amount: '29.99' },
+        { date: 'fecha-invalida', amount: '10' },
+      ],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(1);
+    expect(res.body.invalid).toBe(1);
+  });
+
+  test('acepta fecha en formato DD/MM/YYYY', async () => {
+    mockQuery
+      .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([{ insertId: 2 }]);
+
+    const res = await request(app).post('/api/expenses/import').set(AUTH).send({
+      rows: [{ date: '15/01/2026', amount: '50' }],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(1);
+  });
+
+  test('400 - sin filas', async () => {
+    mockQuery.mockResolvedValueOnce(USER);
+    const res = await request(app).post('/api/expenses/import').set(AUTH).send({ rows: [] });
+    expect(res.status).toBe(400);
+  });
+});

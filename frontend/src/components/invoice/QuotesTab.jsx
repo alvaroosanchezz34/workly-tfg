@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Modal from '../Modal';
 import InvoiceItems from '../InvoiceItems';
 import { Select, Textarea } from '../FormComponents';
@@ -107,12 +107,12 @@ export default function QuotesTab({ token, clients, projects, services }) {
     const [converting, setConverting] = useState(null);
     const [convDates,  setConvDates]  = useState({ issue_date: new Date().toISOString().split('T')[0], due_date: '' });
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try { setQuotes(await getQuotes(token)); }
         finally { setLoading(false); }
-    };
-    useEffect(() => { if (token) load(); }, [token]);
+    }, [token]);
+    useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleSubmit = async data => {
         if (data.id) await updateQuote(token, data.id, data);

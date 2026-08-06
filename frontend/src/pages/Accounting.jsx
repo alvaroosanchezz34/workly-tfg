@@ -1,5 +1,5 @@
 // frontend/src/pages/Accounting.jsx
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import { fetchWithAuth } from '../context/fetchWithAuth';
@@ -59,14 +59,13 @@ export default function Accounting() {
     const [loading, setLoading] = useState(false);
     const [error,   setError]   = useState('');
 
-    const endpoints = {
-        resumen: `/accounting/summary?year=${year}&quarter=${quarter}`,
-        libro:   `/accounting/libro?year=${year}`,
-        m130:    `/accounting/modelo130?year=${year}&quarter=${quarter}`,
-        m303:    `/accounting/modelo303?year=${year}&quarter=${quarter}`,
-    };
-
-    const load = async () => {
+    const load = useCallback(async () => {
+        const endpoints = {
+            resumen: `/accounting/summary?year=${year}&quarter=${quarter}`,
+            libro:   `/accounting/libro?year=${year}`,
+            m130:    `/accounting/modelo130?year=${year}&quarter=${quarter}`,
+            m303:    `/accounting/modelo303?year=${year}&quarter=${quarter}`,
+        };
         setLoading(true); setError(''); setData(null);
         try {
             const res = await fetchWithAuth(`${API}${endpoints[tab]}`, token);
@@ -75,9 +74,9 @@ export default function Accounting() {
             setData(await res.json());
         } catch (err) { setError(err.message); }
         finally { setLoading(false); }
-    };
+    }, [token, tab, year, quarter]);
 
-    useEffect(() => { if (token) load(); }, [tab, year, quarter, token]);
+    useEffect(() => { if (token) load(); }, [load, token]);
 
     return (
         <div className="app-layout">
