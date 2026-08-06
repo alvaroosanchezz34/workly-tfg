@@ -46,7 +46,21 @@ CREATE TABLE IF NOT EXISTS time_entries (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_tasks_project       ON tasks(project_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_user          ON tasks(user_id);
-CREATE INDEX IF NOT EXISTS idx_time_entries_user   ON time_entries(user_id);
-CREATE INDEX IF NOT EXISTS idx_time_entries_active ON time_entries(user_id, stopped_at);
+-- CREATE INDEX no soporta IF NOT EXISTS en MySQL estándar (sí en MariaDB),
+-- así que comprobamos primero en information_schema para poder re-ejecutar
+-- este script sin que falle por índice duplicado.
+SET @idx := (SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND INDEX_NAME = 'idx_tasks_project');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_tasks_project ON tasks(project_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND INDEX_NAME = 'idx_tasks_user');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_tasks_user ON tasks(user_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'time_entries' AND INDEX_NAME = 'idx_time_entries_user');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_time_entries_user ON time_entries(user_id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx := (SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'time_entries' AND INDEX_NAME = 'idx_time_entries_active');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_time_entries_active ON time_entries(user_id, stopped_at)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

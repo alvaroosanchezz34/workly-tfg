@@ -26,4 +26,7 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_recurring_expenses_next ON recurring_expenses(next_date, status);
+-- CREATE INDEX no soporta IF NOT EXISTS en MySQL estándar (sí en MariaDB)
+SET @idx := (SELECT COUNT(1) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recurring_expenses' AND INDEX_NAME = 'idx_recurring_expenses_next');
+SET @sql := IF(@idx = 0, 'CREATE INDEX idx_recurring_expenses_next ON recurring_expenses(next_date, status)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
