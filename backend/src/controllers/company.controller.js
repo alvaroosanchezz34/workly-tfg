@@ -221,10 +221,13 @@ export const updateMemberRole = async (req, res) => {
     if (!req.company) return res.status(400).json({ message: 'Sin empresa' });
 
     try {
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE company_members SET role = ? WHERE company_id = ? AND user_id = ?`,
             [role, req.company.id, userId]
         );
+        if (result.affectedRows === 0)
+            return res.status(404).json({ message: 'El usuario no pertenece a esta empresa' });
+
         await pool.query(
             `UPDATE users SET role = ? WHERE id = ?`,
             [role === 'admin' ? 'company_admin' : 'technician', userId]
@@ -248,10 +251,13 @@ export const updateMemberStatus = async (req, res) => {
         return res.status(400).json({ message: 'No puedes suspender tu propia cuenta' });
 
     try {
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE company_members SET status = ? WHERE company_id = ? AND user_id = ?`,
             [status, req.company.id, userId]
         );
+        if (result.affectedRows === 0)
+            return res.status(404).json({ message: 'El usuario no pertenece a esta empresa' });
+
         await pool.query(
             `UPDATE users SET status = ? WHERE id = ?`,
             [status, userId]
@@ -270,10 +276,13 @@ export const removeMember = async (req, res) => {
         return res.status(400).json({ message: 'No puedes eliminarte a ti mismo' });
 
     try {
-        await pool.query(
+        const [result] = await pool.query(
             `DELETE FROM company_members WHERE company_id = ? AND user_id = ?`,
             [req.company.id, userId]
         );
+        if (result.affectedRows === 0)
+            return res.status(404).json({ message: 'El usuario no pertenece a esta empresa' });
+
         await pool.query(
             `UPDATE users SET company_id = NULL, role = 'user' WHERE id = ?`,
             [userId]
@@ -353,10 +362,11 @@ export const assignClient = async (req, res) => {
         );
         if (!member) return res.status(400).json({ message: 'El usuario no pertenece a la empresa' });
 
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE clients SET assigned_to = ? WHERE id = ? AND company_id = ?`,
             [userId, clientId, req.company.id]
         );
+        if (result.affectedRows === 0) return res.status(404).json({ message: 'Cliente no encontrado en esta empresa' });
         res.json({ message: 'Cliente asignado' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -376,10 +386,11 @@ export const assignProject = async (req, res) => {
         );
         if (!member) return res.status(400).json({ message: 'El usuario no pertenece a la empresa' });
 
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE projects SET assigned_to = ? WHERE id = ? AND company_id = ?`,
             [userId, projectId, req.company.id]
         );
+        if (result.affectedRows === 0) return res.status(404).json({ message: 'Proyecto no encontrado en esta empresa' });
         res.json({ message: 'Proyecto asignado' });
     } catch (err) {
         res.status(500).json({ message: err.message });

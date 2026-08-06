@@ -15,7 +15,7 @@ const fmt = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: '
 export default function InvoiceForm({ clients, projects, services = [], onSubmit, initialData }) {
     const formatDate = d => (!d ? '' : d.split('T')[0]);
 
-    const [items, setItems] = useState(
+    const [items, setItems] = useState(() =>
         initialData?.items?.length
             ? initialData.items.map(i => ({
                 ...i,

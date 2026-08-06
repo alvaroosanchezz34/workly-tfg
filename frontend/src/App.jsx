@@ -1,35 +1,45 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UIProvider, UIContext } from './context/UIContext';
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, lazy, Suspense } from 'react';
 
-import Landing        from './pages/Landing';
-import Login          from './pages/Login';
-import Register       from './pages/Register';
-import Dashboard      from './pages/Dashboard';
-import Clients        from './pages/Clients';
-import ClientProfile  from './pages/ClientProfile';
-import Profile        from './pages/Profile';
-import ActivityLogs   from './pages/ActivityLogs';
-import DeletedClients from './pages/DeletedClients';
-import Services       from './pages/Services';
-import Expenses       from './pages/Expenses';
-import Projects       from './pages/Projects';
-import ProjectTasks   from './pages/ProjectTasks';
-import TimeTracker    from './pages/TimeTracker';
-import Invoices       from './pages/Invoices';
-import PublicInvoice  from './pages/PublicInvoice';
-import Team           from './pages/Team';
-import CompanySetup   from './pages/CompanySetup';
-import Privacidad     from './pages/Privacidad';
-import Estado         from './pages/Estado';
-import Billing        from './pages/Billing';
-import BillingSuccess from './pages/BillingSuccess';
-import Accounting     from './pages/Accounting';
-import CalendarPage   from './pages/Calendar';
+// Landing y Login se cargan de forma inmediata (primera pantalla más habitual).
+// El resto de páginas se cargan bajo demanda para no meter todo el dashboard
+// en el bundle inicial (evita un único chunk de >1MB).
+import Landing         from './pages/Landing';
+import Login           from './pages/Login';
+const Register         = lazy(() => import('./pages/Register'));
+const Dashboard        = lazy(() => import('./pages/Dashboard'));
+const Clients          = lazy(() => import('./pages/Clients'));
+const ClientProfile    = lazy(() => import('./pages/ClientProfile'));
+const Profile          = lazy(() => import('./pages/Profile'));
+const ActivityLogs     = lazy(() => import('./pages/ActivityLogs'));
+const DeletedClients   = lazy(() => import('./pages/DeletedClients'));
+const Services         = lazy(() => import('./pages/Services'));
+const Expenses         = lazy(() => import('./pages/Expenses'));
+const Projects         = lazy(() => import('./pages/Projects'));
+const ProjectTasks     = lazy(() => import('./pages/ProjectTasks'));
+const TimeTracker      = lazy(() => import('./pages/TimeTracker'));
+const Invoices         = lazy(() => import('./pages/Invoices'));
+const PublicInvoice    = lazy(() => import('./pages/PublicInvoice'));
+const Team             = lazy(() => import('./pages/Team'));
+const CompanySetup     = lazy(() => import('./pages/CompanySetup'));
+const Privacidad       = lazy(() => import('./pages/Privacidad'));
+const Estado           = lazy(() => import('./pages/Estado'));
+const Billing          = lazy(() => import('./pages/Billing'));
+const BillingSuccess   = lazy(() => import('./pages/BillingSuccess'));
+const Accounting       = lazy(() => import('./pages/Accounting'));
+const CalendarPage     = lazy(() => import('./pages/Calendar'));
 
 import CookieBanner        from './components/CookieBanner';
 import OnboardingChecklist from './components/OnboardingChecklist';
+import GlobalSearch        from './components/GlobalSearch';
+
+const RouteFallback = () => (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary, #888)', fontSize: 14, fontFamily: 'Inter, sans-serif' }}>
+        Cargando…
+    </div>
+);
 
 const PrivateRoute = ({ children }) => {
     const { token, isAuthenticated } = useContext(AuthContext);
@@ -68,6 +78,13 @@ const NotifPanel = () => {
     );
 };
 
+const GlobalSearchWrapper = () => {
+    const { token } = useContext(AuthContext);
+    const { searchOpen, closeSearch } = useContext(UIContext);
+    if (!searchOpen || !token) return null;
+    return <GlobalSearch token={token} onClose={closeSearch} />;
+};
+
 const OnboardingWrapper = () => {
     const { token, isAuthenticated } = useContext(AuthContext);
     const location = useLocation();
@@ -92,37 +109,40 @@ const OnboardingWrapper = () => {
 
 const AppInner = () => (
     <UIProvider>
-        <Routes>
-            <Route path="/"                element={<Landing />} />
-            <Route path="/login"           element={<Login />} />
-            <Route path="/register"        element={<Register />} />
-            <Route path="/privacidad"      element={<Privacidad />} />
-            <Route path="/estado"          element={<Estado />} />
-            <Route path="/p/:token"        element={<PublicInvoice />} />
+        <Suspense fallback={<RouteFallback />}>
+            <Routes>
+                <Route path="/"                element={<Landing />} />
+                <Route path="/login"           element={<Login />} />
+                <Route path="/register"        element={<Register />} />
+                <Route path="/privacidad"      element={<Privacidad />} />
+                <Route path="/estado"          element={<Estado />} />
+                <Route path="/p/:token"        element={<PublicInvoice />} />
 
-            <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
-            <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
-            <Route path="/clients/:id"     element={<PrivateRoute><ClientProfile /></PrivateRoute>} />
-            <Route path="/projects"        element={<PrivateRoute><Projects /></PrivateRoute>} />
-            <Route path="/projects/:projectId/tasks" element={<PrivateRoute><ProjectTasks /></PrivateRoute>} />
-            <Route path="/time"            element={<PrivateRoute><TimeTracker /></PrivateRoute>} />
-            <Route path="/invoices"        element={<PrivateRoute><Invoices /></PrivateRoute>} />
-            <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
-            <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
-            <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
-            <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
-            <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
-            <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
-            <Route path="/billing"         element={<PrivateRoute><Billing /></PrivateRoute>} />
-            <Route path="/billing/success" element={<PrivateRoute><BillingSuccess /></PrivateRoute>} />
-            <Route path="/accounting"      element={<PrivateRoute><Accounting /></PrivateRoute>} />
-            <Route path="/calendar"        element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
+                <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
+                <Route path="/clients/deleted" element={<PrivateRoute><DeletedClients /></PrivateRoute>} />
+                <Route path="/clients/:id"     element={<PrivateRoute><ClientProfile /></PrivateRoute>} />
+                <Route path="/projects"        element={<PrivateRoute><Projects /></PrivateRoute>} />
+                <Route path="/projects/:projectId/tasks" element={<PrivateRoute><ProjectTasks /></PrivateRoute>} />
+                <Route path="/time"            element={<PrivateRoute><TimeTracker /></PrivateRoute>} />
+                <Route path="/invoices"        element={<PrivateRoute><Invoices /></PrivateRoute>} />
+                <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
+                <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
+                <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
+                <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
+                <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
+                <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
+                <Route path="/billing"         element={<PrivateRoute><Billing /></PrivateRoute>} />
+                <Route path="/billing/success" element={<PrivateRoute><BillingSuccess /></PrivateRoute>} />
+                <Route path="/accounting"      element={<PrivateRoute><Accounting /></PrivateRoute>} />
+                <Route path="/calendar"        element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </Suspense>
 
         <NotifPanel />
+        <GlobalSearchWrapper />
         <OnboardingWrapper />
         <CookieBanner />
     </UIProvider>

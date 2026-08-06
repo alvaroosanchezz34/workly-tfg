@@ -1,15 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function CookieBanner() {
-    const [visible, setVisible] = useState(false);
+    const [visible, setVisible] = useState(() => !localStorage.getItem('workly_cookie_consent'));
     const [showConfig, setShowConfig] = useState(false);
     const [prefs, setPrefs] = useState({ necessary: true, analytics: false, marketing: false });
-
-    useEffect(() => {
-        const consent = localStorage.getItem('workly_cookie_consent');
-        if (!consent) setVisible(true);
-    }, []);
 
     const accept = (all = true) => {
         const consent = all

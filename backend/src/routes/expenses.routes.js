@@ -7,10 +7,11 @@ import {
     deleteExpense
 } from '../controllers/expenses.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { checkLimit } from '../middlewares/plan.middleware.js';
 
 const router = Router();
 
-router.post('/', authenticate, createExpense);
+router.post('/', authenticate, checkLimit('expenses'), createExpense);
 router.get('/', authenticate, getExpenses);
 router.get('/:id', authenticate, getExpenseById);
 router.put('/:id', authenticate, updateExpense);

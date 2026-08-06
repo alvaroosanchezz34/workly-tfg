@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { resourceScope } from '../utils/scope.js';
 
 // Crear proyecto
 export const createProject = async (req, res) => {
@@ -14,14 +15,15 @@ export const createProject = async (req, res) => {
     } = req.body;
 
     try {
-        // Comprobar que el cliente pertenece al usuario y NO está eliminado
+        const scope = resourceScope(req);
+        // Comprobar que el cliente está dentro del ámbito del usuario y NO está eliminado
         const [client] = await pool.query(
             `SELECT id
        FROM clients
        WHERE id = ?
-       AND user_id = ?
+       AND ${scope.where}
        AND is_deleted = 0`,
-            [client_id, req.user.id]
+            [client_id, ...scope.params]
         );
 
         if (client.length === 0) {
@@ -30,10 +32,11 @@ export const createProject = async (req, res) => {
 
         const [result] = await pool.query(
             `INSERT INTO projects
-       (user_id, client_id, title, description, status, start_date, end_date, budget)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (user_id, company_id, client_id, title, description, status, start_date, end_date, budget)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 req.user.id,
+                req.user.company_id || null,
                 client_id,
                 title,
                 description,
@@ -64,8 +67,9 @@ export const createProject = async (req, res) => {
 export const getProjects = async (req, res) => {
     const { search } = req.query;
     try {
-        let where = `p.user_id = ? AND p.is_deleted = 0 AND c.is_deleted = 0`;
-        const params = [req.user.id];
+        const scope  = resourceScope(req, 'p');
+        let where    = `${scope.where} AND p.is_deleted = 0 AND c.is_deleted = 0`;
+        const params = [...scope.params];
         if (search) {
             where += ` AND (p.title LIKE ? OR c.name LIKE ?)`;
             const like = `%${search}%`;
@@ -90,13 +94,14 @@ export const getProjectById = async (req, res) => {
     const { id } = req.params;
 
     try {
+        const scope = resourceScope(req);
         const [rows] = await pool.query(
             `SELECT *
        FROM projects
        WHERE id = ?
-       AND user_id = ?
+       AND ${scope.where}
        AND is_deleted = 0`,
-            [id, req.user.id]
+            [id, ...scope.params]
         );
 
         if (rows.length === 0) {
@@ -122,11 +127,12 @@ export const updateProject = async (req, res) => {
     } = req.body;
 
     try {
+        const scope = resourceScope(req);
         const [result] = await pool.query(
             `UPDATE projects
        SET title = ?, description = ?, status = ?, start_date = ?, end_date = ?, budget = ?
        WHERE id = ?
-       AND user_id = ?
+       AND ${scope.where}
        AND is_deleted = 0`,
             [
                 title,
@@ -136,7 +142,7 @@ export const updateProject = async (req, res) => {
                 end_date,
                 budget,
                 id,
-                req.user.id,
+                ...scope.params,
             ]
         );
 
@@ -162,15 +168,16 @@ export const deleteProject = async (req, res) => {
     const { id } = req.params;
 
     try {
+        const scope = resourceScope(req);
         const [result] = await pool.query(
             `UPDATE projects
        SET is_deleted = 1,
            deleted_at = NOW(),
            deleted_by = ?
        WHERE id = ?
-       AND user_id = ?
+       AND ${scope.where}
        AND is_deleted = 0`,
-            [req.user.id, id, req.user.id]
+            [req.user.id, id, ...scope.params]
         );
 
         if (result.affectedRows === 0) {

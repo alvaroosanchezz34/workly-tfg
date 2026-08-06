@@ -6,10 +6,11 @@ import {
     processRecurringInvoices,
 } from '../controllers/recurringInvoices.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { requireFeature } from '../middlewares/plan.middleware.js';
 
 const router = Router();
 router.get('/',           authenticate, getRecurring);
-router.post('/',          authenticate, createRecurring);
+router.post('/',          authenticate, requireFeature('recurring'), createRecurring);
 router.get('/process',    authenticate, processRecurringInvoices); // llamar como cron
 router.get('/:id',        authenticate, getRecurringById);
 router.patch('/:id/status', authenticate, updateRecurringStatus);

@@ -38,7 +38,6 @@ export default function ActivityLogs() {
     const [pagination,   setPagination]   = useState({ total:0, page:1, pageSize:PAGE_SIZE, totalPages:1 });
     const [loading,      setLoading]      = useState(true);
     const [error,        setError]        = useState('');
-    const [page,         setPage]         = useState(1);
     const [entityFilter, setEntityFilter] = useState('');
 
     const load = useCallback(async (p=1, entity=entityFilter) => {
@@ -56,8 +55,8 @@ export default function ActivityLogs() {
 
     useEffect(() => { load(1,''); }, [token]);
 
-    const handlePage   = p => { setPage(p); load(p, entityFilter); };
-    const handleEntity = e => { setEntityFilter(e); setPage(1); load(1,e); };
+    const handlePage   = p => { load(p, entityFilter); };
+    const handleEntity = e => { setEntityFilter(e); load(1,e); };
 
     return (
         <div className="app-layout">

@@ -9,10 +9,15 @@ import {
 } from 'lucide-react';
 
 // ── API helpers ───────────────────────────────────────────
+// VITE_API_URL ya incluye el prefijo /api (p.ej. http://localhost:3000/api),
+// así que path NO debe repetirlo (evita el 404 por /api/api/...)
 const api = (token, path) =>
     fetch(`${import.meta.env.VITE_API_URL || ''}${path}`, {
         headers: { Authorization: `Bearer ${token}` },
-    }).then(r => r.json());
+    }).then(r => {
+        if (!r.ok) throw new Error(`Error ${r.status} al cargar ${path}`);
+        return r.json();
+    });
 
 // ── Constantes ────────────────────────────────────────────
 const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -76,15 +81,18 @@ export default function CalendarPage() {
     const [selected, setSelected] = useState(null); // key 'YYYY-MM-DD'
     const [events,   setEvents]   = useState([]);
     const [loading,  setLoading]  = useState(true);
+    const [error,    setError]    = useState('');
 
     // Cargar datos
     useEffect(() => {
         if (!token) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos async, no derivable en el render
         setLoading(true);
+        setError('');
         Promise.all([
-            api(token, '/api/invoices?limit=200'),
-            api(token, '/api/quotes?limit=200'),
-            api(token, '/api/projects?limit=200'),
+            api(token, '/invoices?limit=200'),
+            api(token, '/quotes?limit=200'),
+            api(token, '/projects?limit=200'),
         ]).then(([inv, quo, proj]) => {
             const evs = [];
 
@@ -131,7 +139,10 @@ export default function CalendarPage() {
             });
 
             setEvents(evs);
-        }).catch(console.error).finally(() => setLoading(false));
+        }).catch(err => {
+            console.error(err);
+            setError('No se pudieron cargar los eventos del calendario.');
+        }).finally(() => setLoading(false));
     }, [token]);
 
     // Mapa key → eventos
@@ -231,7 +242,11 @@ export default function CalendarPage() {
                         </div>
 
                         {/* Grid días */}
-                        {loading ? (
+                        {error ? (
+                            <div style={{ padding: 40, textAlign: 'center', color: '#F44336', fontSize: 14 }}>
+                                {error}
+                            </div>
+                        ) : loading ? (
                             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 14 }}>
                                 Cargando eventos…
                             </div>

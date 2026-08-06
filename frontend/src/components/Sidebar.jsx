@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, FolderOpen, FileText,
     CreditCard, Wrench, Activity, Trash2, Crown, BookOpen,
     ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun, Timer,
-    CalendarDays, Menu, X,
+    CalendarDays, Menu, X, Building2,
 } from 'lucide-react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useContext, useState, useRef, useEffect } from 'react';
@@ -25,8 +25,9 @@ export default function Sidebar() {
     const menuRef = useRef(null);
     const btnRef  = useRef(null);
 
-    // Cerrar drawer al cambiar de ruta en móvil
-    useEffect(() => { if (isMobile) setOpen(false); }, [location.pathname]);
+    // Cerrar drawer al cambiar de ruta en móvil (reacciona a la navegación, no a datos derivables en el render)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { if (isMobile) setOpen(false); }, [location.pathname, isMobile]);
 
     // Cerrar popup de usuario al hacer click fuera
     useEffect(() => {
@@ -123,6 +124,10 @@ export default function Sidebar() {
                     <div className="sidebar-divider" />
                     <Item to="/billing"    icon={<Crown size={16}/>}    label="Plan y facturación" />
                     <Item to="/accounting" icon={<BookOpen size={16}/>} label="Contabilidad" />
+                    {user?.company_id
+                        ? <Item to="/team" icon={<Users size={16}/>} label="Equipo" />
+                        : <Item to="/company/setup" icon={<Building2 size={16}/>} label="Crear empresa" />
+                    }
                 </nav>
 
                 {/* USER BLOCK */}

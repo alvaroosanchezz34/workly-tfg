@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE TABLE IF NOT EXISTS services (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   user_id       INT NOT NULL,
+  company_id    INT DEFAULT NULL,
   name          VARCHAR(150) NOT NULL,
   default_rate  DECIMAL(10,2),
   unit          VARCHAR(50),
@@ -140,6 +141,8 @@ CREATE TABLE IF NOT EXISTS services (
 
   CONSTRAINT fk_services_user
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_services_company
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
   CONSTRAINT fk_services_deleted_by
     FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -491,6 +494,55 @@ CREATE TABLE IF NOT EXISTS billing_events (
 CREATE INDEX idx_billing_events_user ON billing_events(user_id);
 
 -- ══════════════════════════════════════════════════════════
+-- TASKS (tablero Kanban de tareas por proyecto)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS tasks (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  project_id   INT NOT NULL,
+  user_id      INT NOT NULL,
+  assigned_to  INT DEFAULT NULL,
+
+  title        VARCHAR(200) NOT NULL,
+  description  TEXT,
+  status       ENUM('todo','in_progress','review','done') DEFAULT 'todo',
+  priority     ENUM('low','medium','high','urgent') DEFAULT 'medium',
+  due_date     DATE DEFAULT NULL,
+  position     INT DEFAULT 0,
+
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_tasks_project
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tasks_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tasks_assigned_to
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- ══════════════════════════════════════════════════════════
+-- TIME ENTRIES (control de horas / temporizador)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS time_entries (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NOT NULL,
+  project_id   INT DEFAULT NULL,
+
+  description  VARCHAR(255),
+  started_at   DATETIME NOT NULL,
+  stopped_at   DATETIME DEFAULT NULL,
+  duration     INT DEFAULT NULL COMMENT 'segundos, se rellena al parar el temporizador',
+  hourly_rate  DECIMAL(10,2) DEFAULT 0,
+  billable     TINYINT(1) DEFAULT 1,
+
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_time_entries_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_time_entries_project
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+-- ══════════════════════════════════════════════════════════
 -- ÍNDICES para mejorar rendimiento
 -- ══════════════════════════════════════════════════════════
 CREATE INDEX idx_invoices_user       ON invoices(user_id);
@@ -503,6 +555,10 @@ CREATE INDEX idx_expenses_user       ON expenses(user_id);
 CREATE INDEX idx_quotes_user         ON quotes(user_id);
 CREATE INDEX idx_activity_user       ON activity_logs(user_id);
 CREATE INDEX idx_recurring_next      ON recurring_invoices(next_date, status);
+CREATE INDEX idx_tasks_project       ON tasks(project_id);
+CREATE INDEX idx_tasks_user          ON tasks(user_id);
+CREATE INDEX idx_time_entries_user   ON time_entries(user_id);
+CREATE INDEX idx_time_entries_active ON time_entries(user_id, stopped_at);
 
 SET FOREIGN_KEY_CHECKS = 1;
 

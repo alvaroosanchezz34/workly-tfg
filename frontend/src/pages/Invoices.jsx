@@ -192,7 +192,7 @@ export default function Invoices() {
         setLoading(true); setError('');
         try {
             const [inv, cli, proj, svc] = await Promise.all([
-                getInvoices(token, filters),
+                getInvoices(token, { ...filters, page }),
                 getClients(token),
                 getProjects(token),
                 getServices(token),
@@ -204,9 +204,12 @@ export default function Invoices() {
             setProjects(proj); setServices(svc);
         } catch { setError('No se pudieron cargar las facturas.'); }
         finally { setLoading(false); }
-    }, [token, filters]);
+    }, [token, filters, page]);
 
     useEffect(() => { if (token) load(); }, [load]);
+
+    // Volver a la página 1 cuando cambian los filtros
+    useEffect(() => { setPage(1); }, [filters]);
 
     const loadStats = async () => {
         try { const s = await getInvoiceStats(token); setStats(s); setShowStats(true); }

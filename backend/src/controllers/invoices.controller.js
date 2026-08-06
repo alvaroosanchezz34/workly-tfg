@@ -4,10 +4,13 @@ import { sendInvoiceEmail } from '../services/email.service.js';
 import { logActivity } from '../utils/activityLogger.js';
 import crypto from 'crypto';
 import { getPagination, paginatedResponse } from '../utils/paginate.js';
+import { resourceScope } from '../utils/scope.js';
 
 const getNextInvoiceNumber = async (conn, userId) => {
     const currentYear = new Date().getFullYear();
-    let [rows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ?`, [userId]);
+    // FOR UPDATE bloquea la fila hasta el commit para evitar que dos transacciones
+    // concurrentes lean el mismo next_number y generen facturas duplicadas
+    let [rows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [userId]);
     if (rows.length === 0) {
         await conn.query(`INSERT INTO invoice_settings (user_id, prefix, next_number, padding, current_year) VALUES (?, 'FAC', 1, 4, ?)`, [userId, currentYear]);
         [rows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ?`, [userId]);
@@ -37,13 +40,14 @@ export const createInvoice = async (req, res) => {
     try {
         await conn.beginTransaction();
         if (!Array.isArray(items) || items.length === 0) throw new Error('La factura debe tener al menos una línea');
-        const [client] = await conn.query(`SELECT id FROM clients WHERE id=? AND user_id=? AND is_deleted=0`, [client_id, req.user.id]);
+        const scope = resourceScope(req);
+        const [client] = await conn.query(`SELECT id FROM clients WHERE id=? AND ${scope.where} AND is_deleted=0`, [client_id, ...scope.params]);
         if (client.length === 0) throw new Error('Cliente no válido');
         const { number, seq, year } = await getNextInvoiceNumber(conn, req.user.id);
         const publicToken = crypto.randomBytes(32).toString('hex');
         const [result] = await conn.query(
-            `INSERT INTO invoices (user_id, client_id, project_id, invoice_number, invoice_seq, invoice_year, issue_date, due_date, status, notes, public_token) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-            [req.user.id, client_id, project_id || null, number, seq, year, issue_date, due_date, status || 'draft', notes, publicToken]
+            `INSERT INTO invoices (user_id, company_id, client_id, project_id, invoice_number, invoice_seq, invoice_year, issue_date, due_date, status, notes, public_token) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [req.user.id, req.user.company_id || null, client_id, project_id || null, number, seq, year, issue_date, due_date, status || 'draft', notes, publicToken]
         );
         const invoiceId = result.insertId;
         for (const item of items) {
@@ -67,7 +71,8 @@ export const updateInvoice = async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
-        const [[invoice]] = await conn.query(`SELECT id, payment_status FROM invoices WHERE id=? AND user_id=? AND is_deleted=0`, [id, req.user.id]);
+        const scope = resourceScope(req);
+        const [[invoice]] = await conn.query(`SELECT id, payment_status FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         if (invoice.payment_status === 'paid') return res.status(400).json({ message: 'No se puede modificar una factura pagada' });
         await conn.query(`UPDATE invoices SET client_id=?, project_id=?, issue_date=?, due_date=?, status=?, notes=? WHERE id=?`,
@@ -96,8 +101,9 @@ export const getInvoices = async (req, res) => {
     try {
         // El marcado de facturas vencidas lo gestiona el scheduler diario (09:00)
         // No se hace aquí para evitar latencia extra y escrituras en cada lectura
-        let where = `i.user_id=? AND i.is_deleted=0 AND c.is_deleted=0`;
-        const params = [req.user.id];
+        const scope  = resourceScope(req, 'i');
+        let where    = `${scope.where} AND i.is_deleted=0 AND c.is_deleted=0`;
+        const params = [...scope.params];
         if (status) { where += ` AND i.status=?`; params.push(status); }
         if (client_id) { where += ` AND i.client_id=?`; params.push(client_id); }
         if (date_from) { where += ` AND i.issue_date>=?`; params.push(date_from); }
@@ -123,8 +129,9 @@ export const getInvoices = async (req, res) => {
 export const getInvoiceById = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'i');
         const [[invoice]] = await pool.query(
-            `SELECT i.*, c.name AS client_name, c.email AS client_email, c.company AS client_company, c.document AS client_document FROM invoices i JOIN clients c ON c.id=i.client_id WHERE i.id=? AND i.user_id=? AND i.is_deleted=0`, [id, req.user.id]);
+            `SELECT i.*, c.name AS client_name, c.email AS client_email, c.company AS client_company, c.document AS client_document FROM invoices i JOIN clients c ON c.id=i.client_id WHERE i.id=? AND ${scope.where} AND i.is_deleted=0`, [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         const [items] = await pool.query(`SELECT * FROM invoice_items WHERE invoice_id=? AND is_deleted=0`, [id]);
         const [payments] = await pool.query(`SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY payment_date DESC`, [id]);
@@ -137,7 +144,8 @@ export const softDeleteInvoice = async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
-        const [[invoice]] = await conn.query(`SELECT payment_status FROM invoices WHERE id=? AND user_id=? AND is_deleted=0`, [id, req.user.id]);
+        const scope = resourceScope(req);
+        const [[invoice]] = await conn.query(`SELECT payment_status FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         if (invoice.payment_status === 'paid') return res.status(400).json({ message: 'No se puede eliminar una factura pagada' });
         await conn.query(`UPDATE invoices SET is_deleted=1, deleted_at=NOW(), deleted_by=? WHERE id=?`, [req.user.id, id]);
@@ -154,10 +162,24 @@ export const updateInvoiceStatus = async (req, res) => {
     const { status } = req.body;
     if (!['draft', 'sent', 'paid', 'overdue'].includes(status)) return res.status(400).json({ message: 'Estado no válido' });
     try {
-        const [[inv]] = await pool.query(`SELECT id FROM invoices WHERE id=? AND user_id=? AND is_deleted=0`, [id, req.user.id]);
+        const scope = resourceScope(req);
+        const [[inv]] = await pool.query(`SELECT total_amount, paid_amount FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
         if (!inv) return res.status(404).json({ message: 'Factura no encontrada' });
-        const extra = status === 'paid' ? `, paid_at=NOW(), payment_status='paid'` : '';
-        await pool.query(`UPDATE invoices SET status=? ${extra} WHERE id=?`, [status, id]);
+
+        if (status === 'paid') {
+            // Sincroniza paid_amount con el total al marcar la factura como pagada manualmente
+            await pool.query(
+                `UPDATE invoices SET status=?, paid_amount=total_amount, payment_status='paid', paid_at=NOW() WHERE id=?`,
+                [status, id]
+            );
+        } else {
+            // Recalcula payment_status según lo realmente cobrado en vez de dejarlo
+            // desincronizado (p.ej. al revertir una factura pagada a 'draft'/'sent')
+            const total = Number(inv.total_amount) || 0;
+            const paid  = Number(inv.paid_amount) || 0;
+            const paymentStatus = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial';
+            await pool.query(`UPDATE invoices SET status=?, payment_status=? WHERE id=?`, [status, paymentStatus, id]);
+        }
         res.json({ message: 'Estado actualizado' });
     } catch (err) { res.status(500).json({ message: err.message }); }
 };
@@ -165,17 +187,20 @@ export const updateInvoiceStatus = async (req, res) => {
 export const addPayment = async (req, res) => {
     const { id } = req.params;
     const { amount, payment_date, method, reference, notes } = req.body;
+    if (!(Number(amount) > 0)) return res.status(400).json({ message: 'El importe debe ser mayor que 0' });
+
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
-        const [[invoice]] = await conn.query(`SELECT id, total_amount, paid_amount FROM invoices WHERE id=? AND user_id=? AND is_deleted=0`, [id, req.user.id]);
+        const scope = resourceScope(req);
+        const [[invoice]] = await conn.query(`SELECT id, total_amount, paid_amount FROM invoices WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         const newPaid = Number(invoice.paid_amount) + Number(amount);
         const payStatus = newPaid >= Number(invoice.total_amount) ? 'paid' : 'partial';
         await conn.query(`INSERT INTO invoice_payments (invoice_id, user_id, amount, payment_date, method, reference, notes) VALUES (?,?,?,?,?,?,?)`,
             [id, req.user.id, amount, payment_date, method || 'transfer', reference, notes]);
-        await conn.query(`UPDATE invoices SET paid_amount=?, payment_status=?, status=? WHERE id=?`,
-            [newPaid, payStatus, payStatus === 'paid' ? 'paid' : 'sent', id]);
+        await conn.query(`UPDATE invoices SET paid_amount=?, payment_status=?, status=?, paid_at=? WHERE id=?`,
+            [newPaid, payStatus, payStatus === 'paid' ? 'paid' : 'sent', payStatus === 'paid' ? new Date() : null, id]);
         await conn.commit();
         res.status(201).json({ message: 'Pago registrado', paid_amount: newPaid, payment_status: payStatus });
     } catch (err) { await conn.rollback(); res.status(500).json({ message: err.message }); }
@@ -185,9 +210,10 @@ export const addPayment = async (req, res) => {
 export const getPayments = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'i');
         const [rows] = await pool.query(
-            `SELECT p.* FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE p.invoice_id=? AND i.user_id=? ORDER BY p.payment_date DESC`,
-            [id, req.user.id]);
+            `SELECT p.* FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE p.invoice_id=? AND ${scope.where} ORDER BY p.payment_date DESC`,
+            [id, ...scope.params]);
         res.json(rows);
     } catch (err) { res.status(500).json({ message: err.message }); }
 };
@@ -197,9 +223,10 @@ export const deletePayment = async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
+        const scope = resourceScope(req, 'i');
         const [[payment]] = await conn.query(
-            `SELECT p.amount FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE p.id=? AND p.invoice_id=? AND i.user_id=?`,
-            [paymentId, id, req.user.id]);
+            `SELECT p.amount FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE p.id=? AND p.invoice_id=? AND ${scope.where}`,
+            [paymentId, id, ...scope.params]);
         if (!payment) return res.status(404).json({ message: 'Pago no encontrado' });
         await conn.query(`DELETE FROM invoice_payments WHERE id=?`, [paymentId]);
         const [[inv]] = await conn.query(`SELECT paid_amount, total_amount FROM invoices WHERE id=?`, [id]);
@@ -213,13 +240,14 @@ export const deletePayment = async (req, res) => {
 };
 
 export const getInvoiceStats = async (req, res) => {
-    const userId = req.user.id;
+    const scope  = resourceScope(req);
+    const scopeI = resourceScope(req, 'i');
     try {
-        const [byMonth] = await pool.query(`SELECT DATE_FORMAT(issue_date,'%Y-%m') AS month, SUM(total_amount) AS total, COUNT(*) AS count FROM invoices WHERE user_id=? AND is_deleted=0 AND status!='draft' AND issue_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY month ORDER BY month ASC`, [userId]);
-        const [topClients] = await pool.query(`SELECT c.name, SUM(i.total_amount) AS total, COUNT(*) AS invoices FROM invoices i JOIN clients c ON c.id=i.client_id WHERE i.user_id=? AND i.is_deleted=0 AND i.status='paid' GROUP BY c.id ORDER BY total DESC LIMIT 5`, [userId]);
-        const [taxSummary] = await pool.query(`SELECT SUM(subtotal_amount) AS base_imponible, SUM(tax_amount) AS total_iva, SUM(total_amount) AS total_con_iva FROM invoices WHERE user_id=? AND is_deleted=0 AND status IN ('sent','paid') AND YEAR(issue_date)=YEAR(CURDATE())`, [userId]);
-        const [byStatus] = await pool.query(`SELECT status, COUNT(*) AS count, SUM(total_amount) AS total FROM invoices WHERE user_id=? AND is_deleted=0 GROUP BY status`, [userId]);
-        const [[avgDays]] = await pool.query(`SELECT AVG(DATEDIFF(paid_at,issue_date)) AS avg_days FROM invoices WHERE user_id=? AND is_deleted=0 AND payment_status='paid' AND paid_at IS NOT NULL`, [userId]);
+        const [byMonth] = await pool.query(`SELECT DATE_FORMAT(issue_date,'%Y-%m') AS month, SUM(total_amount) AS total, COUNT(*) AS count FROM invoices WHERE ${scope.where} AND is_deleted=0 AND status!='draft' AND issue_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY month ORDER BY month ASC`, scope.params);
+        const [topClients] = await pool.query(`SELECT c.name, SUM(i.total_amount) AS total, COUNT(*) AS invoices FROM invoices i JOIN clients c ON c.id=i.client_id WHERE ${scopeI.where} AND i.is_deleted=0 AND i.status='paid' GROUP BY c.id ORDER BY total DESC LIMIT 5`, scopeI.params);
+        const [taxSummary] = await pool.query(`SELECT SUM(subtotal_amount) AS base_imponible, SUM(tax_amount) AS total_iva, SUM(total_amount) AS total_con_iva FROM invoices WHERE ${scope.where} AND is_deleted=0 AND status IN ('sent','paid') AND YEAR(issue_date)=YEAR(CURDATE())`, scope.params);
+        const [byStatus] = await pool.query(`SELECT status, COUNT(*) AS count, SUM(total_amount) AS total FROM invoices WHERE ${scope.where} AND is_deleted=0 GROUP BY status`, scope.params);
+        const [[avgDays]] = await pool.query(`SELECT AVG(DATEDIFF(paid_at,issue_date)) AS avg_days FROM invoices WHERE ${scope.where} AND is_deleted=0 AND payment_status='paid' AND paid_at IS NOT NULL`, scope.params);
         res.json({ byMonth, topClients, taxSummary: taxSummary[0], byStatus, avgDays: avgDays.avg_days });
     } catch (err) { res.status(500).json({ message: err.message }); }
 };
@@ -246,9 +274,10 @@ export const updateInvoiceSettings = async (req, res) => {
 export const downloadInvoicePDF = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'i');
         const [[invoice]] = await pool.query(
-            `SELECT i.*, u.name AS issuer_name, u.email AS issuer_email, u.company_name AS issuer_company FROM invoices i JOIN users u ON u.id=i.user_id WHERE i.id=? AND i.user_id=? AND i.is_deleted=0`,
-            [id, req.user.id]);
+            `SELECT i.*, u.name AS issuer_name, u.email AS issuer_email, u.company_name AS issuer_company FROM invoices i JOIN users u ON u.id=i.user_id WHERE i.id=? AND ${scope.where} AND i.is_deleted=0`,
+            [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         const [items] = await pool.query(`SELECT * FROM invoice_items WHERE invoice_id=? AND is_deleted=0`, [id]);
         const [[client]] = await pool.query(`SELECT name, email, company, document FROM clients WHERE id=? AND is_deleted=0`, [invoice.client_id]);
@@ -262,9 +291,10 @@ export const sendInvoiceByEmail = async (req, res) => {
     const { id } = req.params;
     const { to } = req.body;
     try {
+        const scope = resourceScope(req, 'i');
         const [[invoice]] = await pool.query(
-            `SELECT i.*, u.name AS issuer_name, u.email AS issuer_email, u.company_name AS issuer_company FROM invoices i JOIN users u ON u.id=i.user_id WHERE i.id=? AND i.user_id=? AND i.is_deleted=0`,
-            [id, req.user.id]);
+            `SELECT i.*, u.name AS issuer_name, u.email AS issuer_email, u.company_name AS issuer_company FROM invoices i JOIN users u ON u.id=i.user_id WHERE i.id=? AND ${scope.where} AND i.is_deleted=0`,
+            [id, ...scope.params]);
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
         const [items] = await pool.query(`SELECT * FROM invoice_items WHERE invoice_id=? AND is_deleted=0`, [id]);
         const [[client]] = await pool.query(`SELECT name, email, company, document FROM clients WHERE id=? AND is_deleted=0`, [invoice.client_id]);

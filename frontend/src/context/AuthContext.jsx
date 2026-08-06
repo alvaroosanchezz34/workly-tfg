@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { setTokenRefreshListener } from './fetchWithAuth';
 
 export const AuthContext = createContext();
 
@@ -92,6 +93,13 @@ export const AuthProvider = ({ children }) => {
         window.addEventListener('storage', handle);
         return () => window.removeEventListener('storage', handle);
     }, [logout]);
+
+    // Mantener el estado `token` sincronizado con los refreshes silenciosos
+    // que dispara fetchWithAuth.js (fuera de React) al recibir un 401
+    useEffect(() => {
+        setTokenRefreshListener(newToken => setToken(newToken));
+        return () => setTokenRefreshListener(null);
+    }, []);
 
     const login = (accessToken, refreshToken, userData, companyData = null, role = null) => {
         setToken(accessToken);

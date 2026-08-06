@@ -4,7 +4,7 @@ import { pool } from '../config/db.js';
 export const getMe = async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT id, name, email, role, company_name, avatar_url, phone,
+            `SELECT id, name, email, role, company_id, company_name, avatar_url, phone,
                     language, timezone, plan, created_at
              FROM users WHERE id = ?`,
             [req.user.id]
@@ -64,7 +64,7 @@ export const updateProfile = async (req, res) => {
         await pool.query(query, params);
 
         const [updated] = await pool.query(
-            `SELECT id, name, email, role, company_name, avatar_url, phone, language, timezone, plan
+            `SELECT id, name, email, role, company_id, company_name, avatar_url, phone, language, timezone, plan
              FROM users WHERE id = ?`,
             [req.user.id]
         );

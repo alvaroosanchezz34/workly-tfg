@@ -145,7 +145,10 @@ export const stripeWebhook = async (req, res) => {
                 const customer = await getStripe().customers.retrieve(data.customer);
                 const userId   = customer.metadata?.workly_user_id;
                 if (!userId) break;
-                const plan       = data.metadata?.plan || await getPlanFromSubscription(data);
+                // Derivar el plan del price_id actual de la suscripción, no de metadata.plan:
+                // metadata solo se fija al crear la suscripción y queda desactualizada si el
+                // usuario cambia de plan (upgrade/downgrade) desde el portal de Stripe.
+                const plan       = await getPlanFromSubscription(data);
                 const planStatus = data.status;
                 const expiresAt  = data.current_period_end
                     ? new Date(data.current_period_end * 1000)
@@ -214,10 +217,12 @@ const logBillingEvent = async (userId, stripeEventId, type, amount, status) => {
     } catch { /* ignorar duplicados */ }
 };
 
-const getPlanFromSubscription = async subscription => {
-    // Intenta deducir el plan del precio de Stripe
+const getPlanFromSubscription = async (subscription) => {
+    // Deduce el plan a partir del price_id actual de la suscripción
     const priceId = subscription.items?.data?.[0]?.price?.id;
-    if (!priceId) return 'pro';
+    if (!priceId) return subscription.metadata?.plan || 'pro';
     if (priceId === process.env.STRIPE_PRICE_BUSINESS_MONTHLY || priceId === process.env.STRIPE_PRICE_BUSINESS_YEARLY) return 'business';
-    return 'pro';
+    if (priceId === process.env.STRIPE_PRICE_PRO_MONTHLY || priceId === process.env.STRIPE_PRICE_PRO_YEARLY) return 'pro';
+    // price_id desconocido (no coincide con ningún plan configurado) — usar metadata como último recurso
+    return subscription.metadata?.plan || 'pro';
 };

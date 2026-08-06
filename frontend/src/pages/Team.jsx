@@ -305,7 +305,7 @@ export default function Team() {
             {showStats && dashboard && (
                 <Modal open size="lg" title="Rendimiento del equipo" onClose={() => setShowStats(false)}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {(dashboard.byMember || []).map((m, i) => (
+                        {(dashboard.byMember || []).map(m => (
                             <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}>
                                 <div style={{ width: 38, height: 38, borderRadius: 10, background: `${colorFor(m.id)}18`, color: colorFor(m.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
                                     {initials(m.name)}
@@ -368,6 +368,11 @@ function MemberRow({ member, idx, currentUserId, isAdmin, onRole, onStatus, onRe
                     {member.last_login && (
                         <span style={{ fontSize: 12, color: 'var(--text-disabled)', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Clock size={10} /> Último acceso: {new Date(member.last_login).toLocaleDateString('es-ES')}
+                        </span>
+                    )}
+                    {member.joined_at && (
+                        <span style={{ fontSize: 12, color: 'var(--text-disabled)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={10} /> Se unió el {fmtDate(member.joined_at)}
                         </span>
                     )}
                 </div>

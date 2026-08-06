@@ -9,10 +9,8 @@ const API = import.meta.env.VITE_API_URL;
 const PLAN_ICONS = { free: <Zap size={20}/>, pro: <Crown size={20}/>, business: <Building2 size={20}/> };
 const PLAN_COLORS = { free: '#9E9E9E', pro: '#1976D2', business: '#4CAF50' };
 
-const fmt = p => p === 0 ? 'Gratis' : `${p.toFixed(2)}€/mes`;
-
 export default function Billing() {
-    const { token, user } = useContext(AuthContext);
+    const { token } = useContext(AuthContext);
     const [billing,   setBilling]   = useState('monthly');
     const [status,    setStatus]    = useState(null);
     const [plans,     setPlans]     = useState([]);

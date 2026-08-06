@@ -409,7 +409,7 @@ const generateFromRecurring = async rec => {
         await conn.beginTransaction();
 
         const [[settings]] = await conn.query(
-            `SELECT * FROM invoice_settings WHERE user_id = ?`, [rec.user_id]
+            `SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [rec.user_id]
         );
         const cfg = settings || { prefix: 'FAC', next_number: 1, padding: 4 };
         const year = new Date().getFullYear();

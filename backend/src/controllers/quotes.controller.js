@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
 import crypto from 'crypto';
+import { resourceScope } from '../utils/scope.js';
 
 const recalcQuoteTotals = async (conn, quoteId) => {
     const [items] = await conn.query(
@@ -36,18 +37,19 @@ export const createQuote = async (req, res) => {
         if (!Array.isArray(items) || items.length === 0)
             throw new Error('El presupuesto debe tener al menos una línea');
 
+        const scope = resourceScope(req);
         const [client] = await conn.query(
-            `SELECT id FROM clients WHERE id = ? AND user_id = ? AND is_deleted = 0`,
-            [client_id, req.user.id]
+            `SELECT id FROM clients WHERE id = ? AND ${scope.where} AND is_deleted = 0`,
+            [client_id, ...scope.params]
         );
         if (client.length === 0) throw new Error('Cliente no válido');
 
         const quoteNumber = await getNextQuoteNumber(conn, req.user.id);
 
         const [result] = await conn.query(
-            `INSERT INTO quotes (user_id, client_id, project_id, quote_number, issue_date, expiry_date, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, client_id, project_id || null, quoteNumber, issue_date, expiry_date || null, notes]
+            `INSERT INTO quotes (user_id, company_id, client_id, project_id, quote_number, issue_date, expiry_date, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, client_id, project_id || null, quoteNumber, issue_date, expiry_date || null, notes]
         );
         const quoteId = result.insertId;
 
@@ -78,12 +80,13 @@ export const createQuote = async (req, res) => {
 export const getQuotes = async (req, res) => {
     // El marcado de presupuestos expirados lo gestiona el scheduler diario
     try {
+        const scope = resourceScope(req, 'q');
         const [rows] = await pool.query(
             `SELECT q.*, c.name AS client_name FROM quotes q
              JOIN clients c ON c.id = q.client_id
-             WHERE q.user_id = ? AND q.is_deleted = 0 AND c.is_deleted = 0
+             WHERE ${scope.where} AND q.is_deleted = 0 AND c.is_deleted = 0
              ORDER BY q.created_at DESC`,
-            [req.user.id]
+            scope.params
         );
         res.json(rows);
     } catch (err) {
@@ -95,11 +98,12 @@ export const getQuotes = async (req, res) => {
 export const getQuoteById = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'q');
         const [[quote]] = await pool.query(
             `SELECT q.*, c.name AS client_name FROM quotes q
              JOIN clients c ON c.id = q.client_id
-             WHERE q.id = ? AND q.user_id = ? AND q.is_deleted = 0`,
-            [id, req.user.id]
+             WHERE q.id = ? AND ${scope.where} AND q.is_deleted = 0`,
+            [id, ...scope.params]
         );
         if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
 
@@ -119,9 +123,10 @@ export const updateQuote = async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
+        const scope = resourceScope(req);
         const [[quote]] = await conn.query(
-            `SELECT id, status FROM quotes WHERE id = ? AND user_id = ? AND is_deleted = 0`,
-            [id, req.user.id]
+            `SELECT id, status FROM quotes WHERE id = ? AND ${scope.where} AND is_deleted = 0`,
+            [id, ...scope.params]
         );
         if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
         if (['accepted', 'rejected'].includes(quote.status))
@@ -163,8 +168,9 @@ export const updateQuote = async (req, res) => {
 export const deleteQuote = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req);
         const [[quote]] = await pool.query(
-            `SELECT id FROM quotes WHERE id = ? AND user_id = ? AND is_deleted = 0`, [id, req.user.id]
+            `SELECT id FROM quotes WHERE id = ? AND ${scope.where} AND is_deleted = 0`, [id, ...scope.params]
         );
         if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
         await pool.query(`UPDATE quotes SET is_deleted=1, deleted_at=NOW() WHERE id=?`, [id]);
@@ -182,8 +188,9 @@ export const convertQuoteToInvoice = async (req, res) => {
     try {
         await conn.beginTransaction();
 
+        const scope = resourceScope(req);
         const [[quote]] = await conn.query(
-            `SELECT * FROM quotes WHERE id = ? AND user_id = ? AND is_deleted = 0`, [id, req.user.id]
+            `SELECT * FROM quotes WHERE id = ? AND ${scope.where} AND is_deleted = 0`, [id, ...scope.params]
         );
         if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
         if (quote.converted_to_invoice_id)
@@ -191,13 +198,14 @@ export const convertQuoteToInvoice = async (req, res) => {
 
         // Importar función de numeración inline
         const currentYear = new Date().getFullYear();
-        let [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ?`, [req.user.id]);
+        // FOR UPDATE evita que dos conversiones/creaciones concurrentes generen el mismo número
+        let [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [req.user.id]);
         if (cfgRows.length === 0) {
             await conn.query(
                 `INSERT INTO invoice_settings (user_id, prefix, next_number, padding, current_year) VALUES (?, 'FAC', 1, 4, ?)`,
                 [req.user.id, currentYear]
             );
-            [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ?`, [req.user.id]);
+            [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [req.user.id]);
         }
         const cfg    = cfgRows[0];
         const seq    = cfg.next_number;
@@ -207,10 +215,10 @@ export const convertQuoteToInvoice = async (req, res) => {
 
         const publicToken = crypto.randomBytes(32).toString('hex');
         const [result] = await conn.query(
-            `INSERT INTO invoices (user_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
+            `INSERT INTO invoices (user_id, company_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
               issue_date, due_date, status, notes, subtotal_amount, tax_amount, total_amount, public_token)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
-            [req.user.id, quote.client_id, quote.project_id, number, seq, currentYear,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, quote.client_id, quote.project_id, number, seq, currentYear,
              issue_date || quote.issue_date, due_date || quote.expiry_date,
              quote.notes, quote.subtotal_amount, quote.tax_amount, quote.total_amount, publicToken]
         );

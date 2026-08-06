@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { resourceScope } from '../utils/scope.js';
 
 const getNextCreditNumber = async (conn, userId) => {
     const year = new Date().getFullYear();
@@ -17,17 +18,18 @@ export const createCreditNote = async (req, res) => {
     try {
         await conn.beginTransaction();
 
+        const scope = resourceScope(req);
         const [[invoice]] = await conn.query(
-            `SELECT id, total_amount FROM invoices WHERE id = ? AND user_id = ? AND is_deleted = 0`,
-            [invoice_id, req.user.id]
+            `SELECT id, total_amount FROM invoices WHERE id = ? AND ${scope.where} AND is_deleted = 0`,
+            [invoice_id, ...scope.params]
         );
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
 
         const creditNumber = await getNextCreditNumber(conn, req.user.id);
         const [result] = await conn.query(
-            `INSERT INTO credit_notes (user_id, invoice_id, credit_number, issue_date, reason)
-             VALUES (?, ?, ?, ?, ?)`,
-            [req.user.id, invoice_id, creditNumber, issue_date, reason]
+            `INSERT INTO credit_notes (user_id, company_id, invoice_id, credit_number, issue_date, reason)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, invoice_id, creditNumber, issue_date, reason]
         );
         const creditId = result.insertId;
 
@@ -64,14 +66,15 @@ export const createCreditNote = async (req, res) => {
 // Listar notas de crédito
 export const getCreditNotes = async (req, res) => {
     try {
+        const scope = resourceScope(req, 'cn');
         const [rows] = await pool.query(
             `SELECT cn.*, i.invoice_number, c.name AS client_name
              FROM credit_notes cn
              JOIN invoices i ON i.id = cn.invoice_id
              JOIN clients c ON c.id = i.client_id
-             WHERE cn.user_id = ? AND cn.is_deleted = 0
+             WHERE ${scope.where} AND cn.is_deleted = 0
              ORDER BY cn.created_at DESC`,
-            [req.user.id]
+            scope.params
         );
         res.json(rows);
     } catch (err) {
@@ -83,11 +86,12 @@ export const getCreditNotes = async (req, res) => {
 export const getCreditNoteById = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'cn');
         const [[cn]] = await pool.query(
             `SELECT cn.*, i.invoice_number FROM credit_notes cn
              JOIN invoices i ON i.id = cn.invoice_id
-             WHERE cn.id = ? AND cn.user_id = ? AND cn.is_deleted = 0`,
-            [id, req.user.id]
+             WHERE cn.id = ? AND ${scope.where} AND cn.is_deleted = 0`,
+            [id, ...scope.params]
         );
         if (!cn) return res.status(404).json({ message: 'Nota de crédito no encontrada' });
         const [items] = await pool.query(`SELECT * FROM credit_note_items WHERE credit_id = ?`, [id]);
@@ -101,9 +105,11 @@ export const getCreditNoteById = async (req, res) => {
 export const issueCreditNote = async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.query(
-            `UPDATE credit_notes SET status='issued' WHERE id=? AND user_id=?`, [id, req.user.id]
+        const scope = resourceScope(req);
+        const [result] = await pool.query(
+            `UPDATE credit_notes SET status='issued' WHERE id=? AND ${scope.where}`, [id, ...scope.params]
         );
+        if (result.affectedRows === 0) return res.status(404).json({ message: 'Nota de crédito no encontrada' });
         res.json({ message: 'Nota de crédito emitida' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -114,8 +120,9 @@ export const issueCreditNote = async (req, res) => {
 export const deleteCreditNote = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req);
         const [[cn]] = await pool.query(
-            `SELECT status FROM credit_notes WHERE id=? AND user_id=? AND is_deleted=0`, [id, req.user.id]
+            `SELECT status FROM credit_notes WHERE id=? AND ${scope.where} AND is_deleted=0`, [id, ...scope.params]
         );
         if (!cn) return res.status(404).json({ message: 'No encontrada' });
         if (cn.status === 'issued')

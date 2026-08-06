@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { resourceScope } from '../utils/scope.js';
 
 const addInterval = (date, frequency) => {
     const d = new Date(date);
@@ -19,8 +20,9 @@ export const createRecurring = async (req, res) => {
     try {
         await conn.beginTransaction();
 
+        const scope = resourceScope(req);
         const [client] = await conn.query(
-            `SELECT id FROM clients WHERE id=? AND user_id=? AND is_deleted=0`, [client_id, req.user.id]
+            `SELECT id FROM clients WHERE id=? AND ${scope.where} AND is_deleted=0`, [client_id, ...scope.params]
         );
         if (client.length === 0) throw new Error('Cliente no válido');
 
@@ -33,10 +35,10 @@ export const createRecurring = async (req, res) => {
 
         const [result] = await conn.query(
             `INSERT INTO recurring_invoices
-               (user_id, client_id, project_id, frequency, next_date, end_date, notes,
+               (user_id, company_id, client_id, project_id, frequency, next_date, end_date, notes,
                 subtotal_amount, tax_amount, total_amount)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, client_id, project_id || null, frequency, next_date, end_date || null,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, client_id, project_id || null, frequency, next_date, end_date || null,
              notes, subtotal, taxTotal, subtotal + taxTotal]
         );
         const recurringId = result.insertId;
@@ -66,12 +68,13 @@ export const createRecurring = async (req, res) => {
 // Listar recurrentes
 export const getRecurring = async (req, res) => {
     try {
+        const scope = resourceScope(req, 'r');
         const [rows] = await pool.query(
             `SELECT r.*, c.name AS client_name FROM recurring_invoices r
              JOIN clients c ON c.id = r.client_id
-             WHERE r.user_id = ? AND c.is_deleted = 0
+             WHERE ${scope.where} AND c.is_deleted = 0
              ORDER BY r.next_date ASC`,
-            [req.user.id]
+            scope.params
         );
         res.json(rows);
     } catch (err) {
@@ -86,9 +89,11 @@ export const updateRecurringStatus = async (req, res) => {
     if (!['active','paused','finished'].includes(status))
         return res.status(400).json({ message: 'Estado no válido' });
     try {
-        await pool.query(
-            `UPDATE recurring_invoices SET status=? WHERE id=? AND user_id=?`, [status, id, req.user.id]
+        const scope = resourceScope(req);
+        const [result] = await pool.query(
+            `UPDATE recurring_invoices SET status=? WHERE id=? AND ${scope.where}`, [status, id, ...scope.params]
         );
+        if (result.affectedRows === 0) return res.status(404).json({ message: 'No encontrada' });
         res.json({ message: 'Estado actualizado' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -99,7 +104,8 @@ export const updateRecurringStatus = async (req, res) => {
 export const deleteRecurring = async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.query(`DELETE FROM recurring_invoices WHERE id=? AND user_id=?`, [id, req.user.id]);
+        const scope = resourceScope(req);
+        await pool.query(`DELETE FROM recurring_invoices WHERE id=? AND ${scope.where}`, [id, ...scope.params]);
         res.json({ message: 'Factura recurrente eliminada' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -110,10 +116,11 @@ export const deleteRecurring = async (req, res) => {
 export const getRecurringById = async (req, res) => {
     const { id } = req.params;
     try {
+        const scope = resourceScope(req, 'r');
         const [[rec]] = await pool.query(
             `SELECT r.*, c.name AS client_name FROM recurring_invoices r
              JOIN clients c ON c.id = r.client_id
-             WHERE r.id=? AND r.user_id=?`, [id, req.user.id]
+             WHERE r.id=? AND ${scope.where}`, [id, ...scope.params]
         );
         if (!rec) return res.status(404).json({ message: 'No encontrada' });
         const [items] = await pool.query(
@@ -130,6 +137,12 @@ export const getRecurringById = async (req, res) => {
  * Genera facturas automáticas para todas las recurrentes con next_date <= hoy
  */
 export const processRecurringInvoices = async (req, res) => {
+    // Endpoint de disparo manual/admin — el procesado real ya corre automáticamente
+    // vía cron en scheduler.service.js. Restringido a administradores para evitar
+    // que cualquier usuario autenticado dispare la generación de facturas ajenas.
+    if (req.user.role !== 'admin')
+        return res.status(403).json({ message: 'Acceso restringido a administradores' });
+
     const conn = await pool.getConnection();
     let generated = 0;
     try {
@@ -143,7 +156,7 @@ export const processRecurringInvoices = async (req, res) => {
 
         for (const rec of due) {
             const year = new Date().getFullYear();
-            let [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id=?`, [rec.owner_id]);
+            let [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id=? FOR UPDATE`, [rec.owner_id]);
             if (cfgRows.length === 0) {
                 await conn.query(
                     `INSERT INTO invoice_settings (user_id, prefix, next_number, padding, current_year) VALUES (?, 'FAC', 1, 4, ?)`,

@@ -1,5 +1,5 @@
 // frontend/src/pages/TimeTracker.jsx
-import { useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import {
     getTimeEntries, getActiveEntry, getTimeStats,

@@ -38,6 +38,7 @@ export default function Estado() {
         setCheckedAt(new Date());
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- comprobación async al montar, no derivable en el render
     useEffect(() => { check(); }, []);
 
     const allOk      = Object.values(statuses).every(s => s === 'ok');

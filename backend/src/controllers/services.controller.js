@@ -1,15 +1,17 @@
 import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { resourceScope } from '../utils/scope.js';
 
 // Obtener servicios
 export const getServices = async (req, res) => {
     try {
+        const scope = resourceScope(req);
         const [rows] = await pool.query(
             `SELECT *
              FROM services
-             WHERE user_id = ? AND is_deleted = 0
+             WHERE ${scope.where} AND is_deleted = 0
              ORDER BY id DESC`,
-            [req.user.id]
+            scope.params
         );
         res.json(rows);
     } catch (error) {
@@ -27,9 +29,9 @@ export const createService = async (req, res) => {
 
     try {
         const [result] = await pool.query(
-            `INSERT INTO services (user_id, name, default_rate, unit)
-             VALUES (?, ?, ?, ?)`,
-            [req.user.id, name, default_rate || null, unit || null]
+            `INSERT INTO services (user_id, company_id, name, default_rate, unit)
+             VALUES (?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, name, default_rate || null, unit || null]
         );
 
         await logActivity({
@@ -55,11 +57,12 @@ export const updateService = async (req, res) => {
     }
 
     try {
+        const scope = resourceScope(req);
         const [result] = await pool.query(
             `UPDATE services
              SET name = ?, default_rate = ?, unit = ?
-             WHERE id = ? AND user_id = ? AND is_deleted = 0`,
-            [name, default_rate || null, unit || null, id, req.user.id]
+             WHERE id = ? AND ${scope.where} AND is_deleted = 0`,
+            [name, default_rate || null, unit || null, id, ...scope.params]
         );
 
         if (result.affectedRows === 0) {
@@ -84,11 +87,12 @@ export const deleteService = async (req, res) => {
     const { id } = req.params;
 
     try {
+        const scope = resourceScope(req);
         const [result] = await pool.query(
             `UPDATE services
              SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?
-             WHERE id = ? AND user_id = ? AND is_deleted = 0`,
-            [req.user.id, id, req.user.id]
+             WHERE id = ? AND ${scope.where} AND is_deleted = 0`,
+            [req.user.id, id, ...scope.params]
         );
 
         if (result.affectedRows === 0) {

@@ -39,6 +39,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (!token) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos async, no derivable en el render
         setLoading(true);
         setError('');
         getDashboard(token)

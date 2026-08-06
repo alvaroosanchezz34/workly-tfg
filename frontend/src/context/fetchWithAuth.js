@@ -11,6 +11,12 @@ const logoutHard = () => {
 
 let refreshPromise = null; // evitar múltiples refreshes en paralelo
 
+// AuthContext se suscribe a esto para mantener su estado `token` sincronizado
+// cuando el refresh ocurre aquí (fuera de React), evitando que las páginas sigan
+// usando un token expirado y disparen un 401 + refresh en cada petición siguiente.
+let onTokenRefreshed = null;
+export const setTokenRefreshListener = fn => { onTokenRefreshed = fn; };
+
 const doRefresh = async () => {
     if (refreshPromise) return refreshPromise;
 
@@ -33,6 +39,7 @@ const doRefresh = async () => {
             const data = await res.json();
             localStorage.setItem('token', data.accessToken);
             localStorage.setItem('loginTime', Date.now());
+            onTokenRefreshed?.(data.accessToken);
             return data.accessToken;
         } catch {
             logoutHard();

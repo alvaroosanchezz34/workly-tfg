@@ -7,6 +7,7 @@ export const UIProvider = ({ children }) => {
     const { token, isAuthenticated } = useContext(AuthContext);
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
+    const [searchOpen, setSearchOpen] = useState(false);
 
     const loadNotifications = useCallback(async () => {
         if (!token || !isAuthenticated) return;
@@ -35,10 +36,26 @@ export const UIProvider = ({ children }) => {
                 if (end < today) notifs.push({ id: `proj-ov-${proj.id}`, type: 'overdue', title: 'Proyecto vencido', body: proj.title, link: '/projects', read: false });
             });
             setNotifications(notifs.slice(0, 15));
-        } catch {}
+        } catch {
+            // red intermitente / API caída: mantener notificaciones previas
+        }
     }, [token, isAuthenticated]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos async, no derivable en el render
     useEffect(() => { loadNotifications(); }, [loadNotifications]);
+
+    // Atajo de teclado global ⌘K / Ctrl+K para abrir la búsqueda
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        const handle = e => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setSearchOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handle);
+        return () => window.removeEventListener('keydown', handle);
+    }, [isAuthenticated]);
 
     const unread = notifications.filter(n => !n.read).length;
 
@@ -50,6 +67,9 @@ export const UIProvider = ({ children }) => {
             toggleNotif: () => setNotifOpen(v => !v),
             closeNotif:  () => setNotifOpen(false),
             markAllRead: () => setNotifications(n => n.map(x => ({ ...x, read: true }))),
+            searchOpen,
+            openSearch:  () => setSearchOpen(true),
+            closeSearch: () => setSearchOpen(false),
         }}>
             {children}
         </UIContext.Provider>

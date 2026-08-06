@@ -38,6 +38,13 @@ function RecurringForm({ clients, projects, services, onSubmit, onCancel }) {
                     </select>
                 </div>
                 <div className="form-group">
+                    <label className="form-label">Proyecto (opcional)</label>
+                    <select name="project_id" className="form-select" value={form.project_id} onChange={set}>
+                        <option value="">Sin proyecto</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    </select>
+                </div>
+                <div className="form-group">
                     <label className="form-label">Frecuencia</label>
                     <select name="frequency" className="form-select" value={form.frequency} onChange={set}>
                         {FREQ_OPTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
@@ -78,9 +85,11 @@ export default function RecurringTab({ token, clients, projects, services, onPro
     };
     useEffect(() => { if (token) load(); }, [token]);
 
-    const handleCreate = async data => { await createRecurring(token, data); setShowForm(false); load(); };
-    const handleStatus = async (id, status) => { await updateRecurringStatus(token, id, status); load(); };
-    const handleDelete = async id => { if (!confirm('¿Eliminar esta recurrente?')) return; await deleteRecurring(token, id); load(); };
+    // Notifica al padre (Invoices.jsx) para que refresque su lista de facturas,
+    // ya que crear/pausar/eliminar una recurrente puede afectar a las próximas facturas generadas
+    const handleCreate = async data => { await createRecurring(token, data); setShowForm(false); load(); onProcessed?.(); };
+    const handleStatus = async (id, status) => { await updateRecurringStatus(token, id, status); load(); onProcessed?.(); };
+    const handleDelete = async id => { if (!confirm('¿Eliminar esta recurrente?')) return; await deleteRecurring(token, id); load(); onProcessed?.(); };
 
     return (
         <div>

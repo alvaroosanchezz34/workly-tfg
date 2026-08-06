@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function BillingSuccess() {
-    const [params] = useSearchParams();
     const [countdown, setCountdown] = useState(5);
 
     useEffect(() => {
