@@ -93,7 +93,7 @@ function StatusDropdown({ invoice, onUpdate }) {
 function InvoicePreview({ invoice }) {
     const fmtD = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
     return (
-        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+        <div style={{ fontFamily: 'inherit', fontSize: 13 }}>
             <div style={{ background: 'linear-gradient(135deg,#1976D2,#1565C0)', borderRadius: 10, padding: '20px 24px', marginBottom: 20, color: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
@@ -301,7 +301,7 @@ export default function Invoices() {
                             fontSize:13, fontWeight: tab===t?600:400,
                             color: tab===t?'var(--primary)':'var(--text-secondary)',
                             borderBottom:`2px solid ${tab===t?'var(--primary)':'transparent'}`,
-                            marginBottom:-2, fontFamily:'Inter, sans-serif', whiteSpace:'nowrap', transition:'color .15s',
+                            marginBottom:-2, fontFamily:'inherit', whiteSpace:'nowrap', transition:'color .15s',
                         }}>
                             {TAB_LABEL[t]}
                         </button>

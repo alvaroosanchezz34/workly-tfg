@@ -91,7 +91,7 @@ export default function Sidebar() {
                 {/* BUSCADOR */}
                 <button
                     onClick={openSearch}
-                    style={{ margin: '10px 10px 4px', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 12.5, fontFamily: 'Inter, sans-serif', width: 'calc(100% - 20px)' }}
+                    style={{ margin: '10px 10px 4px', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 12.5, fontFamily: 'inherit', width: 'calc(100% - 20px)' }}
                 >
                     <Search size={13} />
                     <span style={{ flex: 1, textAlign: 'left' }}>Buscar…</span>

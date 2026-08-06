@@ -88,7 +88,7 @@ export default function ClientProfile() {
                         display: 'flex', alignItems: 'center', gap: 6,
                         background: 'none', border: 'none', cursor: 'pointer',
                         color: 'var(--text-secondary)', fontSize: 13, padding: '0 0 16px',
-                        fontFamily: 'Inter, sans-serif',
+                        fontFamily: 'inherit',
                     }}
                     onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
@@ -228,7 +228,7 @@ export default function ClientProfile() {
                                     color: tab === t ? 'var(--primary)' : 'var(--text-secondary)',
                                     borderBottom: `2px solid ${tab === t ? 'var(--primary)' : 'transparent'}`,
                                     marginBottom: -1,
-                                    fontFamily: 'Inter, sans-serif',
+                                    fontFamily: 'inherit',
                                     transition: 'color .15s',
                                 }}
                             >

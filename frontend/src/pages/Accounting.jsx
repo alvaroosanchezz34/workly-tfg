@@ -109,7 +109,7 @@ export default function Accounting() {
                             fontSize:13, fontWeight: tab===t.id ? 600 : 400,
                             color: tab===t.id ? 'var(--primary)' : 'var(--text-secondary)',
                             borderBottom:`2px solid ${tab===t.id ? 'var(--primary)' : 'transparent'}`,
-                            marginBottom:-2, fontFamily:'Inter, sans-serif',
+                            marginBottom:-2, fontFamily:'inherit',
                             display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap',
                         }}>
                             {t.icon}{t.label}

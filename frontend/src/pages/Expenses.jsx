@@ -119,7 +119,7 @@ export default function Expenses() {
                             fontSize:13, fontWeight: tab===t?600:400,
                             color: tab===t?'var(--primary)':'var(--text-secondary)',
                             borderBottom:`2px solid ${tab===t?'var(--primary)':'transparent'}`,
-                            marginBottom:-2, fontFamily:'Inter, sans-serif', whiteSpace:'nowrap', transition:'color .15s',
+                            marginBottom:-2, fontFamily:'inherit', whiteSpace:'nowrap', transition:'color .15s',
                         }}>
                             {TAB_LABEL[t]}
                         </button>

@@ -14,7 +14,7 @@ export default function BillingSuccess() {
     }, []);
 
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
             <div style={{ textAlign: 'center', maxWidth: 480, padding: '0 24px' }}>
                 <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--secondary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                     <CheckCircle size={40} color="var(--secondary)" />

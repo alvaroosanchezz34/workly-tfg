@@ -36,7 +36,7 @@ import OnboardingChecklist from './components/OnboardingChecklist';
 import GlobalSearch        from './components/GlobalSearch';
 
 const RouteFallback = () => (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary, #888)', fontSize: 14, fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary, #888)', fontSize: 14, fontFamily: 'inherit' }}>
         Cargando…
     </div>
 );
