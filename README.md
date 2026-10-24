@@ -265,9 +265,9 @@ cd workly-tfg
 mysql -u root -p < backend/scripts/CREATEDATABASE.sql
 ```
 
-Si la base ya existía, aplica una sola vez `backend/scripts/007_verifactu_foundations.sql`. No lo lances sobre una instalación nueva: el esquema completo ya incluye esos cambios.
+Si la base ya existía, aplica una sola vez `backend/scripts/007_verifactu_foundations.sql` y después `backend/scripts/008_verifactu_inhouse.sql`. No los lances sobre una instalación nueva: el esquema completo ya incluye esos cambios.
 
-Esa migración deja las facturas emitidas inmutables, guarda la foto fiscal del emisor y del cliente, numera por emisor y serie, y añade la bitácora. El hash, el XML y el envío a la AEAT no se hacen aquí: `VERIFACTU_PROVIDER=noop` deja el QR y la leyenda VERI*FACTU vacíos hasta que se enchufe un proveedor.
+Esas migraciones dejan las facturas emitidas inmutables y preparan la cola de VeriFactu. Con `VERIFACTU_PROVIDER=noop` no hay QR. Con `VERIFACTU_PROVIDER=aeat` Workly genera la huella, el XML y el envío. La guía está en `docs/VERIFACTU_IMPLEMENTACION.md`. La declaración responsable de `docs/DECLARACION_RESPONSABLE_BORRADOR.md` es un borrador para el asesor.
 
 ### 3. Configurar variables de entorno
 

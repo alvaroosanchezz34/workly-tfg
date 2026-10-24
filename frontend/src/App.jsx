@@ -21,6 +21,8 @@ const Projects         = lazy(() => import('./pages/Projects'));
 const ProjectTasks     = lazy(() => import('./pages/ProjectTasks'));
 const TimeTracker      = lazy(() => import('./pages/TimeTracker'));
 const Invoices         = lazy(() => import('./pages/Invoices'));
+const Verifactu        = lazy(() => import('./pages/Verifactu'));
+const DeclaracionResponsable = lazy(() => import('./pages/DeclaracionResponsable'));
 const PublicInvoice    = lazy(() => import('./pages/PublicInvoice'));
 const Team             = lazy(() => import('./pages/Team'));
 const CompanySetup     = lazy(() => import('./pages/CompanySetup'));
@@ -135,6 +137,8 @@ const AppInner = () => (
                 <Route path="/projects/:projectId/tasks" element={<PrivateRoute><ProjectTasks /></PrivateRoute>} />
                 <Route path="/time"            element={<PrivateRoute><TimeTracker /></PrivateRoute>} />
                 <Route path="/invoices"        element={<PrivateRoute><Invoices /></PrivateRoute>} />
+                <Route path="/verifactu"       element={<PrivateRoute><Verifactu /></PrivateRoute>} />
+                <Route path="/verifactu/declaracion" element={<PrivateRoute><DeclaracionResponsable /></PrivateRoute>} />
                 <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
                 <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
                 <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />

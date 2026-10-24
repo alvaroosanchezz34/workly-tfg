@@ -1,6 +1,6 @@
 // frontend/src/components/Sidebar.jsx
 import {
-    LayoutDashboard, Users, FolderOpen, FileText,
+    LayoutDashboard, Users, FolderOpen, FileText, ShieldCheck,
     CreditCard, Wrench, Activity, Trash2, Crown, BookOpen,
     ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun, Timer,
     CalendarDays, Menu, X, Building2,
@@ -105,6 +105,7 @@ export default function Sidebar() {
                     <Item to="/clients"   icon={<Users size={16}/>}           label="Clientes" />
                     <Item to="/projects"  icon={<FolderOpen size={16}/>}      label="Proyectos" />
                     <Item to="/invoices"  icon={<FileText size={16}/>}        label="Facturas" />
+                    <Item to="/verifactu" icon={<ShieldCheck size={16}/>}      label="VeriFactu" />
 
                     <span className="sidebar-section-label" style={{ marginTop: 8 }}>Finanzas</span>
                     <Item to="/expenses"  icon={<CreditCard size={16}/>}    label="Gastos" />
