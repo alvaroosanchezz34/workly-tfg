@@ -65,12 +65,10 @@ describe('Invoices - POST /api/invoices (con IVA)', () => {
 
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1 }]])     // SELECT cliente válido
-            .mockResolvedValueOnce([[{ id: 1, next_number: 1, prefix: 'FAC', padding: 4, current_year: new Date().getFullYear(), reset_yearly: 1 }]]) // invoice_settings
-            .mockResolvedValueOnce([{}])              // UPDATE next_number
-            .mockResolvedValueOnce([{ insertId: 5 }]) // INSERT factura
+            .mockResolvedValueOnce([{ insertId: 5 }]) // INSERT borrador
             .mockResolvedValueOnce([{}])              // INSERT item
-            .mockResolvedValueOnce([[{ subtotal: 1000, tax_amount: 210, total: 1210 }]]) // recalcTotals SELECT items
-            .mockResolvedValueOnce([{}]);             // UPDATE totals          // UPDATE next_number
+            .mockResolvedValueOnce([{}])              // UPDATE totales
+            .mockResolvedValueOnce([{}]);             // evento draft_created
 
         const res = await request(app)
             .post('/api/invoices')
@@ -79,6 +77,7 @@ describe('Invoices - POST /api/invoices (con IVA)', () => {
 
         expect(res.status).toBe(201);
         expect(res.body.invoiceId).toBe(5);
+        expect(res.body.invoice_number).toBeNull();
         expect(mockConnection.commit).toHaveBeenCalled();
     });
 
@@ -161,19 +160,34 @@ describe('Invoices - GET /api/invoices/:id', () => {
 describe('Invoices - PATCH /api/invoices/:id/status', () => {
     beforeEach(() => jest.clearAllMocks());
 
-    test('200 - cambio de estado rápido a sent', async () => {
+    test('200 - una factura emitida puede marcarse como cobrada', async () => {
         mockQuery
             .mockResolvedValueOnce(USER)
-            .mockResolvedValueOnce([[{ id: 1 }]]) // SELECT factura
-            .mockResolvedValueOnce([{}]);          // UPDATE status
+            .mockResolvedValueOnce([[{ id: 1, status: 'sent', total_amount: 1210, paid_amount: 0, issuer_key: 'user:1' }]])
+            .mockResolvedValueOnce([{}])  // UPDATE status
+            .mockResolvedValueOnce([{}]); // evento
+
+        const res = await request(app)
+            .patch('/api/invoices/1/status')
+            .set(AUTH)
+            .send({ status: 'paid' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toMatch(/actualizado/i);
+    });
+
+    test('400 - un borrador no se emite cambiando el estado', async () => {
+        mockQuery
+            .mockResolvedValueOnce(USER)
+            .mockResolvedValueOnce([[{ id: 1, status: 'draft', total_amount: 100, paid_amount: 0, issuer_key: 'user:1' }]]);
 
         const res = await request(app)
             .patch('/api/invoices/1/status')
             .set(AUTH)
             .send({ status: 'sent' });
 
-        expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/actualizado/i);
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/emite/i);
     });
 
     test('400 - estado no válido', async () => {
@@ -200,9 +214,10 @@ describe('Invoices - POST /api/invoices/:id/payments', () => {
         mockQuery.mockResolvedValueOnce(USER); // authenticate
 
         mockConnection.query
-            .mockResolvedValueOnce([[{ id: 1, total_amount: 1210, paid_amount: 0 }]]) // SELECT factura
+            .mockResolvedValueOnce([[{ id: 1, status: 'sent', issuer_key: 'user:1', total_amount: 1210, paid_amount: 0 }]])
             .mockResolvedValueOnce([{}])   // INSERT payment
-            .mockResolvedValueOnce([{}]);  // UPDATE factura paid_amount
+            .mockResolvedValueOnce([{}])   // UPDATE factura paid_amount
+            .mockResolvedValueOnce([{}]);  // evento
 
         const res = await request(app)
             .post('/api/invoices/1/payments')
@@ -219,7 +234,8 @@ describe('Invoices - POST /api/invoices/:id/payments', () => {
         mockQuery.mockResolvedValueOnce(USER); // authenticate
 
         mockConnection.query
-            .mockResolvedValueOnce([[{ id: 1, total_amount: 1210, paid_amount: 0 }]])
+            .mockResolvedValueOnce([[{ id: 1, status: 'sent', issuer_key: 'user:1', total_amount: 1210, paid_amount: 0 }]])
+            .mockResolvedValueOnce([{}])
             .mockResolvedValueOnce([{}])
             .mockResolvedValueOnce([{}]);
 
@@ -341,7 +357,8 @@ describe('Invoices - DELETE /api/invoices/:id', () => {
         mockQuery.mockResolvedValueOnce(USER); // authenticate
 
         mockConnection.query
-            .mockResolvedValueOnce([[{ status: 'draft', payment_status: 'unpaid' }]])
+            .mockResolvedValueOnce([[{ status: 'draft', issuer_key: 'user:1', payment_status: 'unpaid' }]])
+            .mockResolvedValueOnce([{}])
             .mockResolvedValueOnce([{}])
             .mockResolvedValueOnce([{}]);
 
@@ -350,13 +367,13 @@ describe('Invoices - DELETE /api/invoices/:id', () => {
         expect(mockConnection.commit).toHaveBeenCalled();
     });
 
-    test('400 - no eliminar factura pagada', async () => {
+    test('409 - no eliminar una factura ya emitida', async () => {
         mockQuery.mockResolvedValueOnce(USER); // authenticate
 
-        mockConnection.query.mockResolvedValueOnce([[{ status: 'paid', payment_status: 'paid' }]]);
+        mockConnection.query.mockResolvedValueOnce([[{ status: 'paid', issuer_key: 'user:1', payment_status: 'paid' }]]);
         const res = await request(app).delete('/api/invoices/1').set(AUTH);
-        expect(res.status).toBe(400);
-        expect(res.body.message).toMatch(/pagada/i);
+        expect(res.status).toBe(409);
+        expect(res.body.message).toMatch(/borrador/i);
     });
 
     test('404 - factura no encontrada', async () => {
@@ -375,10 +392,11 @@ describe('Invoices - POST /api/invoices/bulk-delete', () => {
         mockQuery.mockResolvedValueOnce(USER);
 
         mockConnection.query
-            .mockResolvedValueOnce([[{ payment_status: 'unpaid' }]]) // id 1: SELECT
-            .mockResolvedValueOnce([{}])                              // id 1: UPDATE invoices
-            .mockResolvedValueOnce([{}])                              // id 1: UPDATE invoice_items
-            .mockResolvedValueOnce([[{ payment_status: 'paid' }]]);   // id 2: SELECT (se omite)
+            .mockResolvedValueOnce([[{ status: 'draft', issuer_key: 'user:1' }]])
+            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce([[{ status: 'sent', issuer_key: 'user:1' }]]);
 
         const res = await request(app).post('/api/invoices/bulk-delete').set(AUTH).send({ ids: [1, 2] });
 
@@ -406,9 +424,10 @@ describe('Invoices - POST /api/invoices/bulk-status', () => {
         mockQuery.mockResolvedValueOnce(USER);
 
         mockConnection.query
-            .mockResolvedValueOnce([[{ total_amount: 100, paid_amount: 0 }]]) // id 1
-            .mockResolvedValueOnce([{}])                                       // id 1: UPDATE
-            .mockResolvedValueOnce([[undefined]]);                             // id 2: no encontrada
+            .mockResolvedValueOnce([[{ status: 'sent', total_amount: 100, paid_amount: 0, issuer_key: 'user:1' }]])
+            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce([{}])
+            .mockResolvedValueOnce([[undefined]]);
 
         const res = await request(app).post('/api/invoices/bulk-status').set(AUTH).send({ ids: [1, 2], status: 'sent' });
 

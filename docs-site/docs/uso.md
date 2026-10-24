@@ -73,16 +73,21 @@ El plan Free permite hasta **3 proyectos** activos.
 1. En la barra lateral, pulsa **Facturas**.
 2. Pulsa **"Nueva factura"**.
 3. Selecciona el cliente. Opcionalmente vincula la factura a un proyecto.
-4. Añade las líneas de concepto: descripción, cantidad, precio unitario e IVA.
-5. El total se calcula automáticamente.
-6. Elige el estado inicial (**Borrador** o **Enviada**) y la fecha de vencimiento.
-7. Pulsa **Guardar**.
+4. Añade las líneas: descripción, cantidad, precio, IVA y, si aplica, recargo de equivalencia.
+5. Elige si la factura es completa o simplificada, y la retención de IRPF si corresponde.
+6. Pulsa **Guardar**. Queda en borrador, todavía sin número oficial.
+7. Antes de emitir, abre la configuración de facturas y rellena el nombre, el NIF y el domicilio fiscal. En una factura completa el cliente también necesita NIF y domicilio.
+8. Pulsa **Emitir**. Ahí se asigna el número de la serie, sin huecos. A partir de ese momento la factura no se edita ni se borra.
 
-Una vez guardada puedes:
-- **Descargar el PDF** pulsando el icono de descarga.
-- **Enviar por email** al cliente (solo plan Pro).
-- **Registrar pagos parciales** si el cliente paga en varias veces.
-- **Generar un enlace público** para que el cliente vea la factura en el navegador sin necesidad de cuenta.
+Si te equivocas después de emitir:
+- **Rectificar** crea una factura nueva (por sustitución o por diferencias).
+- **Anular** deja el número ocupado y marca la factura como anulada.
+
+También puedes:
+- **Descargar el PDF**. El QR y la leyenda VERI*FACTU aparecen solo cuando el proveedor los devuelve.
+- **Enviar por email** una factura ya emitida (solo plan Pro).
+- **Registrar pagos parciales**.
+- **Generar un enlace público** para que el cliente vea la factura sin cuenta.
 
 ---
 

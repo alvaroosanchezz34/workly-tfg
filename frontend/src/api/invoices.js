@@ -3,6 +3,12 @@ import { fetchWithAuth } from '../context/fetchWithAuth';
 
 const BASE = `${import.meta.env.VITE_API_URL}/invoices`;
 
+const parse = async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'No se pudo completar la operación');
+    return data;
+};
+
 export const getInvoices = (token, filters = {}) => {
     const params = new URLSearchParams(
         Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '' && v != null))
@@ -15,16 +21,31 @@ export const getInvoiceById = (token, id) =>
     fetchWithAuth(`${BASE}/${id}`, token).then(r => r.json());
 
 export const createInvoice = (token, data) =>
-    fetchWithAuth(BASE, token, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
+    fetchWithAuth(BASE, token, { method: 'POST', body: JSON.stringify(data) }).then(parse);
 
 export const updateInvoice = (token, id, data) =>
-    fetchWithAuth(`${BASE}/${id}`, token, { method: 'PUT', body: JSON.stringify(data) }).then(r => r.json());
+    fetchWithAuth(`${BASE}/${id}`, token, { method: 'PUT', body: JSON.stringify(data) }).then(parse);
 
 export const deleteInvoice = (token, id) =>
     fetchWithAuth(`${BASE}/${id}`, token, { method: 'DELETE' });
 
 export const updateInvoiceStatus = (token, id, status) =>
-    fetchWithAuth(`${BASE}/${id}/status`, token, { method: 'PATCH', body: JSON.stringify({ status }) }).then(r => r.json());
+    fetchWithAuth(`${BASE}/${id}/status`, token, { method: 'PATCH', body: JSON.stringify({ status }) }).then(parse);
+
+export const issueInvoice = (token, id) =>
+    fetchWithAuth(`${BASE}/${id}/issue`, token, { method: 'POST', body: '{}' }).then(parse);
+
+export const voidInvoice = (token, id, reason) =>
+    fetchWithAuth(`${BASE}/${id}/void`, token, { method: 'POST', body: JSON.stringify({ reason }) }).then(parse);
+
+export const rectifyInvoice = (token, id, method) =>
+    fetchWithAuth(`${BASE}/${id}/rectify`, token, { method: 'POST', body: JSON.stringify({ method }) }).then(parse);
+
+export const getIssuerProfile = token =>
+    fetchWithAuth(`${BASE}/issuer`, token).then(parse);
+
+export const saveIssuerProfile = (token, data) =>
+    fetchWithAuth(`${BASE}/issuer`, token, { method: 'PUT', body: JSON.stringify(data) }).then(parse);
 
 export const bulkDeleteInvoices = (token, ids) =>
     fetchWithAuth(`${BASE}/bulk-delete`, token, { method: 'POST', body: JSON.stringify({ ids }) }).then(r => r.json());
@@ -55,4 +76,4 @@ export const sendInvoiceByEmail = (token, id, to = null) =>
     fetchWithAuth(`${BASE}/${id}/send`, token, {
         method: 'POST',
         body: JSON.stringify(to ? { to } : {}),
-    }).then(r => r.json());
+    }).then(parse);

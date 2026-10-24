@@ -153,7 +153,9 @@ describe('Clients - DELETE /api/clients/:id (soft delete)', () => {
   test('200 - cliente eliminado (soft delete)', async () => {
     mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
 
-    mockQuery.mockResolvedValueOnce([{ affectedRows: 1 }]);
+    mockQuery
+      .mockResolvedValueOnce([[{ n: 0 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app)
       .delete('/api/clients/1')
@@ -166,13 +168,24 @@ describe('Clients - DELETE /api/clients/:id (soft delete)', () => {
   test('404 - cliente no encontrado al eliminar', async () => {
     mockQuery.mockResolvedValueOnce(USER); // authenticate → usuario
 
-    mockQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
+    mockQuery
+      .mockResolvedValueOnce([[{ n: 0 }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const res = await request(app)
       .delete('/api/clients/999')
       .set(AUTH_HEADER);
 
     expect(res.status).toBe(404);
+  });
+
+  test('409 - no elimina un cliente con facturas emitidas', async () => {
+    mockQuery.mockResolvedValueOnce(USER);
+    mockQuery.mockResolvedValueOnce([[{ n: 2 }]]);
+
+    const res = await request(app).delete('/api/clients/1').set(AUTH_HEADER);
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(/emitidas/i);
   });
 });
 
@@ -225,7 +238,9 @@ describe('Clients - POST /api/clients/bulk-delete', () => {
   test('200 - elimina varios clientes', async () => {
     mockQuery
       .mockResolvedValueOnce(USER)
+      .mockResolvedValueOnce([[{ n: 0 }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([[{ n: 0 }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const res = await request(app).post('/api/clients/bulk-delete').set(AUTH_HEADER).send({ ids: [1, 2] });

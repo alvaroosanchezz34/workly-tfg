@@ -63,7 +63,7 @@ El proyecto incluye además un sistema de **planes de suscripción** (Free / Pro
 |---|---|
 | **Clientes** | CRUD completo, búsqueda en tiempo real, avatares con iniciales, soft delete, papelera de reciclaje (admin), restauración, perfil de cliente con historial |
 | **Proyectos** | CRUD, vinculación con cliente, soft delete, estado (activo/completado/pausado) |
-| **Facturas** | CRUD, líneas de detalle con subtotal/IVA/descuento, descarga PDF, envío por email (Pro), estados (borrador/enviada/pagada/vencida), factura pública sin login, número correlativo automático |
+| **Facturas** | Borrador editable y factura emitida inmutable, rectificativa (sustitución o diferencias) y anulación, desglose de IVA, recargo de equivalencia e IRPF, PDF, envío por email (Pro), número correlativo por emisor y serie al emitir |
 | **Presupuestos** | CRUD, conversión a factura en un clic, PDF descargable |
 | **Facturas recurrentes** | Creación de plantillas con periodicidad, generación automática via scheduler (node-cron) |
 | **Notas de crédito** | Vinculación a factura original, corrección de importes |
@@ -106,6 +106,7 @@ El proyecto incluye además un sistema de **planes de suscripción** (Free / Pro
 | JSON Web Token | ^9.0.3 | Access token (30 min) + Refresh token (7 días) |
 | bcrypt | ^6.0.0 | Hash seguro de contraseñas |
 | PDFKit | ^0.17.2 | Generación de facturas y presupuestos en PDF |
+| qrcode | ^1.5.4 | QR del PDF solo cuando el proveedor VeriFactu devuelve la URL |
 | ExcelJS | ^4.4.0 | Exportación de datos a `.xlsx` |
 | Resend | ^6.12.2 | Envío de emails transaccionales |
 | Stripe | ^22.1.0 | Suscripciones, checkout, portal de facturación |
@@ -263,6 +264,10 @@ cd workly-tfg
 ```bash
 mysql -u root -p < backend/scripts/CREATEDATABASE.sql
 ```
+
+Si la base ya existía, aplica una sola vez `backend/scripts/007_verifactu_foundations.sql`. No lo lances sobre una instalación nueva: el esquema completo ya incluye esos cambios.
+
+Esa migración deja las facturas emitidas inmutables, guarda la foto fiscal del emisor y del cliente, numera por emisor y serie, y añade la bitácora. El hash, el XML y el envío a la AEAT no se hacen aquí: `VERIFACTU_PROVIDER=noop` deja el QR y la leyenda VERI*FACTU vacíos hasta que se enchufe un proveedor.
 
 ### 3. Configurar variables de entorno
 
@@ -441,7 +446,7 @@ La integración con **Stripe** incluye:
 
 ## 🧪 Testing
 
-El backend cuenta con **8 suites de tests de integración** usando Jest + Supertest, con un total de ~1.400 líneas de test:
+El backend cuenta con suites de tests usando Jest + Supertest:
 
 | Suite | Casos cubiertos |
 |---|---|
@@ -451,6 +456,7 @@ El backend cuenta con **8 suites de tests de integración** usando Jest + Supert
 | `company.test.js` | Setup de empresa, invitación, roles |
 | `expenses.test.js` | CRUD, categorías, límites de plan |
 | `invoices.test.js` | CRUD, líneas de detalle, PDF, estados |
+| `verifactu.foundation.test.js` | Totales, NIF, numeración, emisión, anulación, rectificativa y proveedor vacío |
 | `projects.test.js` | CRUD, vinculación con cliente |
 | `quotes.test.js` | CRUD, conversión a factura |
 

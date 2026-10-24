@@ -16,8 +16,13 @@ export const getPublicInvoice = async (req, res) => {
         const [[invoice]] = await pool.query(
             `SELECT
                 i.id, i.invoice_number, i.issue_date, i.due_date, i.status,
-                i.subtotal_amount, i.tax_amount, i.total_amount,
+                i.subtotal_amount, i.tax_amount, i.equivalence_surcharge_amount,
+                i.irpf_rate, i.irpf_amount, i.total_amount,
                 i.paid_amount, i.payment_status, i.notes,
+                i.invoice_type, i.rectification_method,
+                i.issuer_legal_name, i.issuer_tax_id, i.issuer_fiscal_address,
+                i.customer_legal_name, i.customer_tax_id, i.customer_fiscal_address,
+                i.verifactu_qr_url, i.verifactu_legend,
                 c.name  AS client_name,
                 c.email AS client_email,
                 c.company AS client_company,
@@ -64,11 +69,13 @@ export const createPublicInvoiceCheckout = async (req, res) => {
 
     try {
         const [[invoice]] = await pool.query(
-            `SELECT id, invoice_number, total_amount, paid_amount, payment_status
+            `SELECT id, invoice_number, total_amount, paid_amount, payment_status, status
              FROM invoices WHERE public_token = ? AND is_deleted = 0`,
             [token]
         );
         if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
+        if (invoice.status === 'void') return res.status(400).json({ message: 'Esta factura está anulada' });
+        if (invoice.status === 'draft') return res.status(400).json({ message: 'Esta factura todavía es un borrador' });
         if (invoice.payment_status === 'paid') return res.status(400).json({ message: 'Esta factura ya está pagada' });
 
         const pending = Math.round((Number(invoice.total_amount) - Number(invoice.paid_amount)) * 100) / 100;

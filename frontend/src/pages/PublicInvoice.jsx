@@ -17,6 +17,7 @@ const STATUS = {
     sent:    { label: 'Enviada',  icon: <FileText size={14}/>,      bg: '#E1F5FE',                   color: '#0288D1' },
     paid:    { label: 'Pagada',   icon: <CheckCircle size={14}/>,   bg: '#E8F5E9',                   color: '#2E7D32' },
     overdue: { label: 'Vencida',  icon: <AlertTriangle size={14}/>, bg: '#FFEBEE',                   color: '#C62828' },
+    void:    { label: 'Anulada',  icon: <XCircle size={14}/>,       bg: '#FFEBEE',                   color: '#C62828' },
 };
 
 export default function PublicInvoice() {
@@ -81,10 +82,10 @@ export default function PublicInvoice() {
         </div>
     );
 
-    const { invoice_number, issue_date, due_date, status, total_amount, paid_amount, payment_status, notes, client, issuer, items } = data;
+    const { invoice_number, issue_date, due_date, status, total_amount, paid_amount, payment_status, notes, client, issuer, items, verifactu_legend, verifactu_qr_url, irpf_amount, irpf_rate, equivalence_surcharge_amount } = data;
     const st = STATUS[status] || STATUS.sent;
     const pending = Math.round((Number(total_amount) - Number(paid_amount || 0)) * 100) / 100;
-    const canPay = payment_status !== 'paid' && pending > 0;
+    const canPay = status !== 'draft' && status !== 'void' && payment_status !== 'paid' && pending > 0;
 
     return (
         <div style={pageStyle}>
@@ -105,7 +106,7 @@ export default function PublicInvoice() {
                                 FACTURA
                             </div>
                             <div style={{ color: '#FFFFFF', fontSize: 26, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                                {invoice_number}
+                                {invoice_number || 'Borrador'}
                             </div>
                             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 }}>
                                 {issuer.name}
@@ -244,6 +245,19 @@ export default function PublicInvoice() {
                             </>
                         ) : null}
                     </div>
+
+                    {(verifactu_qr_url || verifactu_legend) && (
+                        <div style={{ marginTop: 16, padding: '12px 14px', border: '1px dashed #90CAF9', borderRadius: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#1565C0' }}>QR tributario:</div>
+                            {verifactu_legend && <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>{verifactu_legend}</div>}
+                        </div>
+                    )}
+                    {(Number(equivalence_surcharge_amount) > 0 || Number(irpf_amount) > 0) && (
+                        <div style={{ marginTop: 12, fontSize: 13, color: '#616161', textAlign: 'right' }}>
+                            {Number(equivalence_surcharge_amount) > 0 && <div>Recargo de equivalencia: {fmt(equivalence_surcharge_amount)}</div>}
+                            {Number(irpf_amount) > 0 && <div>IRPF {irpf_rate}%: -{fmt(irpf_amount)}</div>}
+                        </div>
+                    )}
 
                     {/* Notas */}
                     {notes && (

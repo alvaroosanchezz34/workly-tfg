@@ -2,6 +2,8 @@ import { pool } from '../config/db.js';
 import { logActivity } from '../utils/activityLogger.js';
 import crypto from 'crypto';
 import { resourceScope } from '../utils/scope.js';
+import { issuerKeyFor } from '../services/invoicing/numbering.js';
+import { appendInvoiceEvent } from '../services/invoicing/invoiceEvents.js';
 
 const recalcQuoteTotals = async (conn, quoteId) => {
     const [items] = await conn.query(
@@ -192,34 +194,27 @@ export const convertQuoteToInvoice = async (req, res) => {
         const [[quote]] = await conn.query(
             `SELECT * FROM quotes WHERE id = ? AND ${scope.where} AND is_deleted = 0`, [id, ...scope.params]
         );
-        if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
-        if (quote.converted_to_invoice_id)
-            return res.status(400).json({ message: 'Este presupuesto ya fue convertido' });
-
-        // Importar función de numeración inline
-        const currentYear = new Date().getFullYear();
-        // FOR UPDATE evita que dos conversiones/creaciones concurrentes generen el mismo número
-        let [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [req.user.id]);
-        if (cfgRows.length === 0) {
-            await conn.query(
-                `INSERT INTO invoice_settings (user_id, prefix, next_number, padding, current_year) VALUES (?, 'FAC', 1, 4, ?)`,
-                [req.user.id, currentYear]
-            );
-            [cfgRows] = await conn.query(`SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [req.user.id]);
+        if (!quote) {
+            await conn.rollback();
+            return res.status(404).json({ message: 'Presupuesto no encontrado' });
         }
-        const cfg    = cfgRows[0];
-        const seq    = cfg.next_number;
-        const padded = String(seq).padStart(cfg.padding, '0');
-        const number = `${cfg.prefix}-${currentYear}-${padded}`;
-        await conn.query(`UPDATE invoice_settings SET next_number = next_number + 1 WHERE user_id = ?`, [req.user.id]);
+        if (quote.converted_to_invoice_id) {
+            await conn.rollback();
+            return res.status(400).json({ message: 'Este presupuesto ya fue convertido' });
+        }
 
+        // El número oficial se asigna al emitir, no al convertir. Así no quedan huecos
+        // si el borrador se descarta.
         const publicToken = crypto.randomBytes(32).toString('hex');
+        const issuerKey = issuerKeyFor(req.user);
+        const issueDate = issue_date || quote.issue_date;
+        const dueDate = due_date || quote.expiry_date || issueDate;
         const [result] = await conn.query(
-            `INSERT INTO invoices (user_id, company_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
+            `INSERT INTO invoices (user_id, company_id, client_id, project_id, issuer_key, invoice_number,
               issue_date, due_date, status, notes, subtotal_amount, tax_amount, total_amount, public_token)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
-            [req.user.id, req.user.company_id || null, quote.client_id, quote.project_id, number, seq, currentYear,
-             issue_date || quote.issue_date, due_date || quote.expiry_date,
+             VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || quote.company_id || null, quote.client_id, quote.project_id, issuerKey,
+             issueDate, dueDate,
              quote.notes, quote.subtotal_amount, quote.tax_amount, quote.total_amount, publicToken]
         );
         const invoiceId = result.insertId;
@@ -239,10 +234,14 @@ export const convertQuoteToInvoice = async (req, res) => {
             `UPDATE quotes SET status='accepted', converted_to_invoice_id=? WHERE id=?`,
             [invoiceId, id]
         );
+        await appendInvoiceEvent(conn, {
+            invoiceId, issuerKey, userId: req.user.id, action: 'draft_created',
+            payload: { source: 'quote', quote_id: Number(id) },
+        });
 
         await logActivity({ userId: req.user.id, entity: 'invoice', entityId: invoiceId, action: 'created' });
         await conn.commit();
-        res.status(201).json({ message: 'Factura creada desde presupuesto', invoiceId, invoice_number: number });
+        res.status(201).json({ message: 'Borrador creado desde presupuesto', invoiceId, invoice_number: null });
     } catch (err) {
         await conn.rollback();
         res.status(500).json({ message: err.message });

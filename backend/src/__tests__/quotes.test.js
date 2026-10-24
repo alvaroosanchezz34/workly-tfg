@@ -89,12 +89,11 @@ describe('Quotes - POST /api/quotes/:id/convert', () => {
         mockQuery.mockResolvedValueOnce(USER); // authenticate
         mockConnection.query
             .mockResolvedValueOnce([[{ id: 1, client_id: 1, project_id: null, issue_date: '2025-01-01', expiry_date: '2025-01-31', notes: 'Test', subtotal_amount: 1000, tax_amount: 210, total_amount: 1210, converted_to_invoice_id: null }]])
-            .mockResolvedValueOnce([[{ prefix: 'FAC', next_number: 1, padding: 4, current_year: 2025 }]]) // settings
-            .mockResolvedValueOnce([{}])   // UPDATE next_number
-            .mockResolvedValueOnce([{ insertId: 7 }]) // INSERT invoice
-            .mockResolvedValueOnce([[{ id: 1, description: 'Diseño', quantity: 2, unit_price: 500, tax_rate: 21, subtotal: 1000, tax_amount: 210, total: 1210 }]]) // quote items
+            .mockResolvedValueOnce([{ insertId: 7 }]) // INSERT borrador
+            .mockResolvedValueOnce([[{ id: 1, description: 'Diseño', quantity: 2, unit_price: 500, tax_rate: 21, subtotal: 1000, tax_amount: 210, total: 1210 }]])
             .mockResolvedValueOnce([{}])   // INSERT invoice item
-            .mockResolvedValueOnce([{}]);  // UPDATE quote status
+            .mockResolvedValueOnce([{}])   // UPDATE quote status
+            .mockResolvedValueOnce([{}]);  // evento draft_created
 
         const res = await request(app)
             .post('/api/quotes/1/convert')
@@ -103,7 +102,7 @@ describe('Quotes - POST /api/quotes/:id/convert', () => {
 
         expect(res.status).toBe(201);
         expect(res.body.invoiceId).toBe(7);
-        expect(res.body.invoice_number).toMatch(/^FAC-/);
+        expect(res.body.invoice_number).toBeNull();
         expect(mockConnection.commit).toHaveBeenCalled();
     });
 

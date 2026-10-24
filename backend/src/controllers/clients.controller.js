@@ -6,14 +6,14 @@ import { getLimit } from '../config/plans.js';
 
 // Crear cliente
 export const createClient = async (req, res) => {
-    const { name, email, phone, company, notes, document } = req.body;
+    const { name, email, phone, company, notes, document, address } = req.body;
 
     try {
         const [result] = await pool.query(
             `INSERT INTO clients
-      (user_id, company_id, name, email, phone, company, notes, document)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, req.user.company_id || null, name, email, phone, company, notes, document]
+      (user_id, company_id, name, email, phone, company, notes, document, address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, name, email, phone, company, notes, document, address || null]
         );
         await logActivity({
             userId: req.user.id,
@@ -89,17 +89,17 @@ export const getClientById = async (req, res) => {
 // Actualizar cliente
 export const updateClient = async (req, res) => {
     const { id } = req.params;
-    const { name, email, phone, company, notes, document } = req.body;
+    const { name, email, phone, company, notes, document, address } = req.body;
 
     try {
         const scope = resourceScope(req);
         const [result] = await pool.query(
             `UPDATE clients
-       SET name = ?, email = ?, phone = ?, company = ?, notes = ?, document = ?
+       SET name = ?, email = ?, phone = ?, company = ?, notes = ?, document = ?, address = ?
        WHERE id = ?
        AND ${scope.where}
        AND is_deleted = 0`,
-            [name, email, phone, company, notes, document, id, ...scope.params]
+            [name, email, phone, company, notes, document, address || null, id, ...scope.params]
         );
 
         if (result.affectedRows === 0) {
@@ -119,12 +119,27 @@ export const updateClient = async (req, res) => {
     }
 };
 
-// Eliminar cliente (SOFT DELETE)
+const countIssuedInvoices = async (clientId, scope) => {
+    const [[{ n }]] = await pool.query(
+        `SELECT COUNT(*) AS n FROM invoices
+         WHERE client_id = ? AND ${scope.where} AND is_deleted = 0 AND status <> 'draft'`,
+        [clientId, ...scope.params]
+    );
+    return Number(n || 0);
+};
+
+// Eliminar cliente (SOFT DELETE). Si ya hay facturas emitidas, se conserva.
 export const deleteClient = async (req, res) => {
     const { id } = req.params;
 
     try {
         const scope = resourceScope(req);
+        const issued = await countIssuedInvoices(id, scope);
+        if (issued > 0) {
+            return res.status(409).json({
+                message: 'Este cliente tiene facturas emitidas. No se puede eliminar: hay que conservar sus datos.',
+            });
+        }
         const [result] = await pool.query(
             `UPDATE clients
        SET is_deleted = 1,
@@ -162,7 +177,10 @@ export const bulkDeleteClients = async (req, res) => {
     try {
         const scope = resourceScope(req);
         let deleted = 0;
+        let blocked = 0;
         for (const id of ids) {
+            const issued = await countIssuedInvoices(id, scope);
+            if (issued > 0) { blocked++; continue; }
             const [result] = await pool.query(
                 `UPDATE clients SET is_deleted=1, deleted_at=NOW(), deleted_by=? WHERE id=? AND ${scope.where} AND is_deleted=0`,
                 [req.user.id, id, ...scope.params]
@@ -172,7 +190,13 @@ export const bulkDeleteClients = async (req, res) => {
                 deleted++;
             }
         }
-        res.json({ message: `${deleted} cliente(s) eliminado(s)`, deleted, skipped: ids.length - deleted });
+        const skipped = ids.length - deleted;
+        res.json({
+            message: `${deleted} cliente(s) eliminado(s)` + (blocked ? `, ${blocked} conservado(s) por tener facturas emitidas` : ''),
+            deleted,
+            skipped,
+            blocked,
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -323,11 +347,12 @@ export const importClients = async (req, res) => {
             const name = (row.name || row.nombre || '').trim();
             if (!name) { invalid++; continue; }
             await pool.query(
-                `INSERT INTO clients (user_id, company_id, name, email, phone, company, notes, document)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO clients (user_id, company_id, name, email, phone, company, notes, document, address)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [req.user.id, req.user.company_id || null, name,
                  row.email || null, row.phone || row.telefono || null, row.company || row.empresa || null,
-                 row.notes || row.notas || null, row.document || row.dni || row.nif || null]
+                 row.notes || row.notas || null, row.document || row.dni || row.nif || null,
+                 row.address || row.direccion || row.domicilio || null]
             );
             imported++;
         }
