@@ -35,6 +35,7 @@ const Accounting       = lazy(() => import('./pages/Accounting'));
 const CalendarPage     = lazy(() => import('./pages/Calendar'));
 
 import CookieBanner        from './components/CookieBanner';
+import SkipLink            from './components/SkipLink';
 import OnboardingChecklist from './components/OnboardingChecklist';
 import GlobalSearch        from './components/GlobalSearch';
 
@@ -121,6 +122,7 @@ const OnboardingWrapper = () => {
 
 const AppInner = () => (
     <UIProvider>
+        <SkipLink />
         <Suspense fallback={<RouteFallback />}>
             <Routes>
                 <Route path="/"                element={<Landing />} />

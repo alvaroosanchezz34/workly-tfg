@@ -238,7 +238,7 @@ export default function Landing() {
           --orange: #F5843A;   /* naranja del logo */
           --dark:   #0D1117;
           --mid:    #3D4451;
-          --muted:  #6B7280;
+          --muted:  #3E4654;
           --border: #E4E7EC;
           --bg:     #F7F8FA;
           --white:  #FFFFFF;
@@ -258,7 +258,14 @@ export default function Landing() {
         .d10{transition-delay:.58s} .d11{transition-delay:.64s} .d12{transition-delay:.70s}
 
         /* Nav */
-        .nl { font-size:14px; font-weight:500; color:var(--muted); cursor:pointer; text-decoration:none; transition:color .18s; letter-spacing:-.01em; }
+        .nl { font-size:14px; font-weight:500; color:var(--muted); cursor:pointer; text-decoration:none; transition:color .18s; letter-spacing:-.01em; background:none; border:none; font-family:inherit; padding:8px 0; min-height:44px; }
+        .nl:focus-visible, .btn-p:focus-visible, .btn-s:focus-visible, .fi:focus-visible, .ham:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+        .btn-p, .btn-s { min-height:44px; }
+        @media (prefers-reduced-motion: reduce) {
+          .fade-up, .fade-up.in { opacity:1 !important; transform:none !important; transition:none !important; }
+          .tkr, .fc, .btn-p, .btn-s { animation:none !important; transition:none !important; }
+          .fc:hover, .btn-p:hover { transform:none !important; }
+        }
         .nl:hover { color:var(--dark); }
 
         /* Buttons */
@@ -308,7 +315,7 @@ export default function Landing() {
         /* Mobile */
         .mob-overlay { position:fixed; inset:0; background:rgba(13,17,23,.6); z-index:98; backdrop-filter:blur(6px); animation:fadeIn .2s; }
         .mob-menu { position:fixed; top:0; right:0; bottom:0; width:min(320px,86vw); background:#fff; z-index:99; padding:72px 28px 36px; display:flex; flex-direction:column; gap:2px; border-left:1px solid var(--border); animation:slideR .26s cubic-bezier(.4,0,.2,1); overflow-y:auto; box-shadow:-12px 0 48px rgba(0,0,0,.1); }
-        .ml { font-size:20px; font-weight:700; color:var(--mid); cursor:pointer; padding:13px 0; border-bottom:1px solid var(--border); transition:color .15s; display:block; text-decoration:none; letter-spacing:-.02em; }
+        .ml { font-size:20px; font-weight:700; color:var(--mid); cursor:pointer; padding:13px 0; border-bottom:1px solid var(--border); transition:color .15s; display:block; text-decoration:none; letter-spacing:-.02em; background:none; border-left:none; border-right:none; border-top:none; font-family:inherit; text-align:left; width:100%; min-height:44px; }
         .ml:hover { color:var(--dark); }
 
         /* Responsive */
@@ -349,7 +356,7 @@ export default function Landing() {
         {/* Desktop links */}
         <div className="dsk" style={{ display:'flex', gap:28, alignItems:'center' }}>
           {NAV.map(({ label, id }) => (
-            <span key={id} className="nl" onClick={() => scrollTo(id)}>{label}</span>
+            <button type="button" key={id} className="nl" onClick={() => scrollTo(id)}>{label}</button>
           ))}
         </div>
 
@@ -362,7 +369,7 @@ export default function Landing() {
         </div>
 
         {/* Hamburger */}
-        <button className="ham" onClick={() => setMenuOpen(v => !v)}
+        <button type="button" className="ham" aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)}
           style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', flexDirection:'column', gap:5 }}>
           {[0,1,2].map(i => (
             <span key={i} style={{
@@ -387,7 +394,7 @@ export default function Landing() {
               <span style={{ fontWeight:800, fontSize:16, letterSpacing:'-.02em' }}>Workly</span>
             </div>
             {NAV.map(({ label, id }) => (
-              <span key={id} className="ml" onClick={() => scrollTo(id)}>{label}</span>
+              <button type="button" key={id} className="ml" onClick={() => scrollTo(id)}>{label}</button>
             ))}
             <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:28 }}>
               <Link to="/login" onClick={() => setMenuOpen(false)} style={{ textAlign:'center', padding:'12px', border:'1.5px solid var(--border)', borderRadius:8, color:'var(--mid)', fontWeight:600, fontSize:14.5, textDecoration:'none' }}>
@@ -715,7 +722,7 @@ export default function Landing() {
                 <img src="/logo.png" alt="Workly" style={{ width:32, height:32, borderRadius:7, objectFit:'cover' }} />
                 <span style={{ fontWeight:800, fontSize:16, color:'#fff', letterSpacing:'-.02em' }}>Workly</span>
               </div>
-              <p style={{ fontSize:13.5, color:'rgba(255,255,255,.35)', lineHeight:1.8, maxWidth:260, marginBottom:20 }}>
+              <p style={{ fontSize:13.5, color:'rgba(255,255,255,.78)', lineHeight:1.8, maxWidth:260, marginBottom:20 }}>
                 Herramienta de gestión para freelancers y autónomos. Facturación, proyectos y contabilidad en un solo lugar.
               </p>
               <Link to="/register" className="btn-p" style={{ fontSize:13, padding:'9px 18px', display:'inline-flex' }}>
@@ -753,10 +760,10 @@ export default function Landing() {
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                   {col.items.map(item => (
                     item.href
-                      ? <Link key={item.label} to={item.href} style={{ fontSize:14, color:'rgba(255,255,255,.4)', textDecoration:'none', transition:'color .15s' }}
-                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{item.label}</Link>
-                      : <span key={item.label} onClick={item.onClick} style={{ fontSize:14, color:'rgba(255,255,255,.4)', cursor:'pointer', transition:'color .15s' }}
-                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.4)'}>{item.label}</span>
+                      ? <Link key={item.label} to={item.href} style={{ fontSize:14, color:'rgba(255,255,255,.82)', textDecoration:'none', transition:'color .15s', minHeight:44, display:'inline-flex', alignItems:'center' }}
+                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.82)'}>{item.label}</Link>
+                      : <button type="button" key={item.label} onClick={item.onClick} style={{ fontSize:14, color:'rgba(255,255,255,.82)', cursor:'pointer', background:'none', border:'none', fontFamily:'inherit', textAlign:'left', padding:'8px 0', minHeight:44 }}
+                          onMouseEnter={e => e.target.style.color='#fff'} onMouseLeave={e => e.target.style.color='rgba(255,255,255,.82)'}>{item.label}</button>
                   ))}
                 </div>
               </div>

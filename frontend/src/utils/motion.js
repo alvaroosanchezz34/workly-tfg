@@ -19,10 +19,15 @@ export const staggerContainer = {
     show: { transition: { staggerChildren: 0.045, delayChildren: 0.02 } },
 };
 
-export const staggerItem = {
-    hidden: { opacity: 0, y: 14, scale: 0.98 },
-    show:   { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 340, damping: 30 } },
-};
+const reducedMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+export const staggerItem = reducedMotion()
+    ? { hidden: { opacity: 1 }, show: { opacity: 1, transition: { duration: 0 } } }
+    : {
+        hidden: { opacity: 0, y: 14, scale: 0.98 },
+        show:   { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 340, damping: 30 } },
+    };
 
 // Igual que staggerItem pero sin scale, más sutil para filas de tabla densas.
 export const staggerRow = {
