@@ -26,6 +26,7 @@ import {
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
 import { getServices } from '../api/services';
+import { Link } from 'react-router-dom';
 import { Plus, FileText, Download, Receipt, BarChart2, Settings, Eye, ChevronDown, Send, Mail } from 'lucide-react';
 import { MotionTbody, MotionTr, staggerContainer, staggerRow } from '../utils/motion';
 
@@ -52,6 +53,15 @@ const STATUS_TRANSITIONS = {
     void:    [],
 };
 const invoiceLabel = inv => inv?.invoice_number || 'Borrador';
+const verifactuLabel = {
+    queued: 'AEAT en cola',
+    pending_certificate: 'AEAT sin certificado',
+    sending: 'AEAT enviando',
+    correcto: 'AEAT correcto',
+    aceptado_con_errores: 'AEAT con errores',
+    incorrecto: 'AEAT incorrecto',
+    error_tecnico: 'AEAT error técnico',
+};
 const TABS = ['facturas', 'presupuestos', 'recurrentes', 'notas-credito'];
 const TAB_LABEL = { facturas: 'Facturas', presupuestos: 'Presupuestos', recurrentes: 'Recurrentes', 'notas-credito': 'Notas de crédito' };
 
@@ -161,7 +171,14 @@ function InvoicePreview({ invoice }) {
             {invoice.verifactu_legend && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 12.5 }}>
                     <strong>QR tributario: </strong>{invoice.verifactu_legend}
+                    {invoice.verifactu_status ? ` · ${invoice.verifactu_status}` : ''}
+                    {' '}<Link to={`/verifactu?invoiceId=${invoice.id}`}>Ver envío</Link>
                 </div>
+            )}
+            {Number(invoice.irpf_amount) > 0 && (
+                <p style={{ marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+                    El total a pagar resta el IRPF. El importe del QR y del registro de la AEAT es la base más el IVA y el recargo, sin restar el IRPF.
+                </p>
             )}
             {invoice.notes && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
@@ -205,6 +222,7 @@ export default function Invoices() {
     const [fiscal,       setFiscal]       = useState(null);
     const [voidReason,   setVoidReason]   = useState('');
     const [rectifyMethod, setRectifyMethod] = useState('substitution');
+    const [rectifyCode, setRectifyCode] = useState('R1');
     const [fiscalBusy,   setFiscalBusy]   = useState(false);
 
     const [filters, setFilters] = useState({
@@ -269,6 +287,7 @@ export default function Invoices() {
     const openFiscal = (type, invoice) => {
         setVoidReason('');
         setRectifyMethod('substitution');
+        setRectifyCode(invoice.invoice_kind === 'simplified' ? 'R5' : 'R1');
         setFiscal({ type, invoice });
     };
     const handleFiscal = async () => {
@@ -277,7 +296,7 @@ export default function Invoices() {
         try {
             if (fiscal.type === 'issue') await issueInvoice(token, fiscal.invoice.id);
             else if (fiscal.type === 'void') await voidInvoice(token, fiscal.invoice.id, voidReason.trim());
-            else await rectifyInvoice(token, fiscal.invoice.id, rectifyMethod);
+            else await rectifyInvoice(token, fiscal.invoice.id, rectifyMethod, rectifyCode);
             setFiscal(null);
             load();
         } catch (err) { alert(err.message); }
@@ -418,6 +437,7 @@ export default function Invoices() {
                                                     </div>
                                                     <div>
                                                         <div style={{ fontWeight:700, fontSize:14, fontVariantNumeric:'tabular-nums' }}>{invoiceLabel(inv)}</div>
+                                                        {verifactuLabel[inv.verifactu_status] && <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{verifactuLabel[inv.verifactu_status]}</div>}
                                                         <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:1 }}>{inv.client_name}</div>
                                                     </div>
                                                 </div>
@@ -490,6 +510,7 @@ export default function Invoices() {
                                                                 <FileText size={13} color="var(--primary)"/>
                                                             </div>
                                                             <span style={{ fontWeight:600, fontSize:13, fontVariantNumeric:'tabular-nums' }}>{invoiceLabel(inv)}</span>
+                                                            {verifactuLabel[inv.verifactu_status] && <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{verifactuLabel[inv.verifactu_status]}</div>}
                                                         </div>
                                                     </td>
                                                     <td style={{ color:'var(--text-secondary)', fontSize:13 }}>{inv.client_name}</td>
@@ -570,6 +591,7 @@ export default function Invoices() {
                 {fiscal?.type === 'issue' && (
                     <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
                         Se asignará el siguiente número de la serie y se guardará una copia de los datos fiscales. Después ya no se podrá editar.
+                        {Number(fiscal.invoice?.irpf_amount) > 0 && ' El QR usa el importe antes de restar el IRPF.'}
                     </p>
                 )}
                 {fiscal?.type === 'void' && (
@@ -584,6 +606,12 @@ export default function Invoices() {
                         <select className="form-select" value={rectifyMethod} onChange={e => setRectifyMethod(e.target.value)}>
                             <option value="substitution">Por sustitución</option>
                             <option value="difference">Por diferencias</option>
+                        </select>
+                        <label className="form-label" style={{ marginTop: 12 }}>Código AEAT</label>
+                        <select className="form-select" value={rectifyCode} onChange={e => setRectifyCode(e.target.value)}>
+                            {fiscal.invoice?.invoice_kind === 'simplified'
+                                ? <option value="R5">R5 · simplificada</option>
+                                : ['R1', 'R2', 'R3', 'R4'].map(code => <option key={code} value={code}>{code}</option>)}
                         </select>
                         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8 }}>
                             Se crea un borrador nuevo. El número se asigna cuando lo emitas.

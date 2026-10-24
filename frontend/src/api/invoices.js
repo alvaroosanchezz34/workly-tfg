@@ -38,8 +38,8 @@ export const issueInvoice = (token, id) =>
 export const voidInvoice = (token, id, reason) =>
     fetchWithAuth(`${BASE}/${id}/void`, token, { method: 'POST', body: JSON.stringify({ reason }) }).then(parse);
 
-export const rectifyInvoice = (token, id, method) =>
-    fetchWithAuth(`${BASE}/${id}/rectify`, token, { method: 'POST', body: JSON.stringify({ method }) }).then(parse);
+export const rectifyInvoice = (token, id, method, code) =>
+    fetchWithAuth(`${BASE}/${id}/rectify`, token, { method: 'POST', body: JSON.stringify({ method, code }) }).then(parse);
 
 export const getIssuerProfile = token =>
     fetchWithAuth(`${BASE}/issuer`, token).then(parse);

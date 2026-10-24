@@ -1,5 +1,6 @@
 // backend/src/services/pdf.service.js
 import PDFDocument from 'pdfkit';
+import { QR_LABEL, QR_SIZE_PT } from './verifactu/qr.js';
 
 const PRIMARY    = '#1976D2';
 const GREY_DARK  = '#212121';
@@ -42,12 +43,18 @@ const buildPDF = (doc, invoice, items, client, qrBuffer) => {
 
     let y = 155;
     if (qrBuffer) {
-        doc.image(qrBuffer, M, y, { width: 100 });
-        doc.fillColor(GREY_DARK).font('Helvetica-Bold').fontSize(8).text('QR tributario:', M + 112, y + 8);
+        const qrSize = QR_SIZE_PT;
+        doc.fillColor(GREY_DARK).font('Helvetica-Bold').fontSize(8)
+            .text(QR_LABEL, M, y, { width: qrSize, align: 'center' });
+        y += 12;
+        doc.image(qrBuffer, M, y, { width: qrSize });
+        y += qrSize + 4;
         if (invoice.verifactu_legend) {
-            doc.font('Helvetica-Bold').fontSize(12).text(invoice.verifactu_legend, M + 112, y + 24, { width: 280 });
+            doc.font('Helvetica-Bold').fontSize(9)
+                .text(invoice.verifactu_legend, M, y, { width: qrSize, align: 'center' });
+            y += 14;
         }
-        y += 116;
+        y += 10;
     }
 
     const blockTop = y;

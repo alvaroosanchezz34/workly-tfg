@@ -27,6 +27,7 @@ import tasksRoutes from './routes/tasks.routes.js';
 import timeTrackingRoutes from './routes/timeTracking.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import recurringExpensesRoutes from './routes/recurringExpenses.routes.js';
+import verifactuRoutes from './routes/verifactu.routes.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -68,6 +69,7 @@ app.use('/api/company', companyRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/invoices', invoicesRoutes);
+app.use('/api/verifactu', verifactuRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/credit-notes', creditNotesRoutes);
 app.use('/api/recurring-invoices', recurringRoutes);

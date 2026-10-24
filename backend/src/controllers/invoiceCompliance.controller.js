@@ -168,6 +168,17 @@ export const issueInvoice = async (req, res) => {
             year,
         });
 
+        let rectified = null;
+        if (invoice.rectifies_invoice_id) {
+            const [[original]] = await conn.query(
+                `SELECT invoice_number, issue_date, issuer_tax_id, subtotal_amount, tax_amount, equivalence_surcharge_amount
+                 FROM invoices WHERE id = ?`,
+                [invoice.rectifies_invoice_id]
+            );
+            if (!original?.invoice_number) throw fail(400, 'No se encuentra la factura que se quiere rectificar');
+            rectified = original;
+        }
+
         const registro = {
             invoiceId: Number(id),
             issuerKey,
@@ -184,7 +195,11 @@ export const issueInvoice = async (req, res) => {
             invoiceKind: kind,
             invoiceType: invoice.invoice_type || 'normal',
             rectificationMethod: invoice.rectification_method,
+            rectificationCode: invoice.rectification_code || null,
             rectifiesInvoiceId: invoice.rectifies_invoice_id,
+            rectified,
+            description: items.map(item => item.description).filter(Boolean).join('. '),
+            conn,
             seriesCode,
             invoiceNumber: allocated.number,
             issueDate: invoice.issue_date,
@@ -259,7 +274,7 @@ export const voidInvoice = async (req, res) => {
         await conn.beginTransaction();
         const scope = resourceScope(req);
         const [[invoice]] = await conn.query(
-            `SELECT id, status, invoice_number, issuer_key, issuer_tax_id, series_code, issue_date, issued_at
+            `SELECT id, status, invoice_number, issuer_key, issuer_tax_id, issuer_legal_name, series_code, issue_date, issued_at
              FROM invoices WHERE id = ? AND ${scope.where} AND is_deleted = 0 FOR UPDATE`,
             [id, ...scope.params]
         );
@@ -274,9 +289,11 @@ export const voidInvoice = async (req, res) => {
             invoiceNumber: invoice.invoice_number,
             issuerKey: invoice.issuer_key,
             issuerTaxId: invoice.issuer_tax_id,
+            issuerLegalName: invoice.issuer_legal_name,
             seriesCode: invoice.series_code,
             issueDate: invoice.issue_date,
             reason,
+            conn,
         });
 
         await conn.query(
@@ -309,6 +326,7 @@ export const createRectificativa = async (req, res) => {
     if (method !== 'substitution' && method !== 'difference') {
         return res.status(400).json({ message: 'El método tiene que ser substitution (sustitución) o difference (diferencias)' });
     }
+    const requestedCode = String(req.body?.code || '').trim().toUpperCase();
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -331,6 +349,15 @@ export const createRectificativa = async (req, res) => {
             : originalItems;
         const priced = priceItems(sourceItems, req.body.irpf_rate ?? original.irpf_rate ?? 0);
 
+        const simplified = original.invoice_kind === 'simplified';
+        const allowedCodes = simplified ? ['R5'] : ['R1', 'R2', 'R3', 'R4'];
+        if (requestedCode && !allowedCodes.includes(requestedCode)) {
+            throw fail(400, simplified
+                ? 'Una rectificativa simplificada usa el código R5'
+                : 'El código de rectificativa tiene que ser R1, R2, R3 o R4');
+        }
+        const rectificationCode = requestedCode || (simplified ? 'R5' : 'R1');
+
         const issuerKey = original.issuer_key || issuerKeyFor(req.user);
         const publicToken = (await import('crypto')).randomBytes(32).toString('hex');
         const notePrefix = method === 'substitution'
@@ -342,8 +369,8 @@ export const createRectificativa = async (req, res) => {
             `INSERT INTO invoices
                (user_id, company_id, client_id, project_id, issuer_key,
                 invoice_number, issue_date, due_date, status, notes, public_token,
-                invoice_kind, invoice_type, rectification_method, rectifies_invoice_id, irpf_rate)
-             VALUES (?,?,?,?,?,?,?,?, 'draft', ?, ?, ?, 'rectificativa', ?, ?, ?)`,
+                invoice_kind, invoice_type, rectification_method, rectification_code, rectifies_invoice_id, irpf_rate)
+             VALUES (?,?,?,?,?,?,?,?, 'draft', ?, ?, ?, 'rectificativa', ?, ?, ?, ?)`,
             [
                 req.user.id, req.user.company_id || original.company_id || null, original.client_id, original.project_id,
                 issuerKey, null,
@@ -351,7 +378,7 @@ export const createRectificativa = async (req, res) => {
                 req.body.due_date || original.due_date,
                 notes, publicToken,
                 original.invoice_kind || 'complete',
-                method, original.id, priced.totals.irpf_rate,
+                method, rectificationCode, original.id, priced.totals.irpf_rate,
             ]
         );
         const newId = result.insertId;
@@ -380,6 +407,7 @@ export const createRectificativa = async (req, res) => {
             invoiceId: newId,
             rectifies_invoice_id: original.id,
             method,
+            code: rectificationCode,
         });
     } catch (err) {
         await conn.rollback();
