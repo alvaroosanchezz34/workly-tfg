@@ -8,23 +8,34 @@ export const FormField = ({ label, required, htmlFor, children }) => (
     </div>
 );
 
-export const Input = ({ label, required, id, name, ...props }) => {
+export const Input = ({ label, required, id, name, error, ...props }) => {
     const fieldId = id || name;
+    const errorId = error ? `${fieldId}-error` : undefined;
     return (
         <FormField label={label} required={required} htmlFor={fieldId}>
-            <input className="form-input" id={fieldId} name={name} {...props} />
+            <input
+                className="form-input"
+                id={fieldId}
+                name={name}
+                aria-invalid={error ? 'true' : undefined}
+                aria-describedby={errorId}
+                {...props}
+            />
+            {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
         </FormField>
     );
 };
 
-export const Select = ({ label, required, options, placeholder, id, name, ...props }) => {
+export const Select = ({ label, required, options, placeholder, id, name, error, ...props }) => {
     const fieldId = id || name;
+    const errorId = error ? `${fieldId}-error` : undefined;
     return (
         <FormField label={label} required={required} htmlFor={fieldId}>
-            <select className="form-select" id={fieldId} name={name} {...props}>
+            <select className="form-select" id={fieldId} name={name} aria-invalid={error ? 'true' : undefined} aria-describedby={errorId} {...props}>
                 {placeholder && <option value="">{placeholder}</option>}
                 {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
         </FormField>
     );
 };

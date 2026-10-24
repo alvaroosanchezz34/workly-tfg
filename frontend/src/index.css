@@ -42,7 +42,7 @@
   --border:         #E7E9F5;
 
   --text-primary:   #23253A;
-  --text-secondary: #6B6F8A;
+  --text-secondary: #3E4462;
   --text-disabled:  #A7ABC4;
 
   /* — Sidebar (siempre oscuro) — */
@@ -1286,3 +1286,44 @@ html, body {
     min-width: 480px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ACCESIBILIDAD — foco, contraste de error y zona táctil
+   ══════════════════════════════════════════════════════════════ */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 10000;
+  background: #fff;
+  color: #1C2033;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 12px;
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn, .form-input, .form-select, .form-textarea, .login-btn, .action-link {
+  min-height: 44px;
+}
+.action-link { display: inline-flex; align-items: center; }
+
+.form-error {
+  margin-top: 6px;
+  color: #9F1239;
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-theme="dark"] .form-error { color: #FECDD3; }
+
+.page-content:focus { outline: none; }
