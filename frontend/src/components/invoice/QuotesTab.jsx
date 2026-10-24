@@ -6,6 +6,7 @@ import { getQuotes, createQuote, updateQuote, deleteQuote, convertQuote } from '
 import AISmartQuote from '../ai/AISmartQuote';
 import { Plus, FileText, ArrowRight, CheckCircle } from 'lucide-react';
 import useIsMobile from '../../hooks/useIsMobile';
+import { useFeedback } from '../../context/FeedbackContext';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -22,6 +23,7 @@ const genId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)
 
 function QuoteForm({ clients, projects, services, initialData, onSubmit, onCancel }) {
     const narrow = useIsMobile(720);
+    const { toast } = useFeedback();
     const fmt2d = d => (!d ? '' : d.split('T')[0]);
     const [form, setForm] = useState({
         client_id: initialData?.client_id || '', project_id: initialData?.project_id || '',
@@ -44,7 +46,7 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
 
     const handleSubmit = e => {
         e.preventDefault();
-        if (!form.client_id || !form.issue_date) return alert('Cliente y fecha son obligatorios');
+        if (!form.client_id || !form.issue_date) return toast('Elige cliente y fecha', 'error');
         onSubmit({ ...form, items, id: initialData?.id });
     };
 
@@ -102,6 +104,7 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
 
 export default function QuotesTab({ token, clients, projects, services }) {
     const isMobile = useIsMobile(720);
+    const { toast } = useFeedback();
     const [quotes,   setQuotes]   = useState([]);
     const [loading,  setLoading]  = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -129,9 +132,9 @@ export default function QuotesTab({ token, clients, projects, services }) {
             const number = result.invoice_number
                 ? `Factura ${result.invoice_number} creada.`
                 : 'Borrador creado. El número oficial se asigna cuando pulses Emitir, en Facturas.';
-            alert(number);
+            toast(number, 'success');
             setConverting(null); load();
-        } catch (err) { alert(err.message); }
+        } catch (err) { toast(err.message, 'error'); }
     };
 
     return (

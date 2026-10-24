@@ -75,6 +75,10 @@ El panel parte los gráficos en otro fichero, bien. La primera carga sigue arras
 2. **Siguiente:** toasts y confirmaciones propias, éxito al emitir, menos `alert`.
 3. **Después:** presupuesto en obra (catálogo, firma, enlace), recordatorio y WhatsApp, antigüedad de cobros, CSV del trimestre, foto del ticket, agenda más clara, borrador sin red y asistente fiscal.
 
+## Después del pulido de avisos
+
+Emitir, anular, rectificar y pasar un presupuesto a factura ya no usan `alert`. El resultado sale en un aviso de la propia página, con `role="status"`, y se apaga solo. Borrar varios borradores pide confirmación dentro de la app. Si no hay red, emitir se bloquea: el número y la huella de VeriFactu no pueden salir desordenados.
+
 ## Lo que esta auditoría no tapa
 
 Los textos legales siguen en borrador. VeriFactu no se emite sin red. El precio de la web sigue siendo un marcador.

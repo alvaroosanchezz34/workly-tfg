@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { FeedbackProvider } from './context/FeedbackContext';
 import { UIProvider, UIContext } from './context/UIContext';
 import { useContext, useState, useEffect, lazy, Suspense } from 'react';
 
@@ -171,9 +172,11 @@ const AppInner = () => (
 
 const App = () => (
     <AuthProvider>
-        <BrowserRouter>
-            <AppInner />
-        </BrowserRouter>
+        <FeedbackProvider>
+            <BrowserRouter>
+                <AppInner />
+            </BrowserRouter>
+        </FeedbackProvider>
     </AuthProvider>
 );
 
