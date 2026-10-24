@@ -1,14 +1,7 @@
 import { useState } from 'react';
-import { Select, Textarea } from './FormComponents';
+import { Textarea } from './FormComponents';
 import InvoiceItems from './InvoiceItems';
 import AIInvoiceGenerator from './ai/AIInvoiceGenerator';
-
-const STATUS_OPTIONS = [
-    { value: 'draft',   label: 'Borrador' },
-    { value: 'sent',    label: 'Enviada'  },
-    { value: 'paid',    label: 'Pagada'   },
-    { value: 'overdue', label: 'Vencida'  },
-];
 
 const fmt = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 
@@ -21,8 +14,9 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
                 ...i,
                 id: i.id || `item_${Math.random().toString(36).slice(2)}`,
                 tax_rate: i.tax_rate ?? 21,
+                equivalence_surcharge_rate: i.equivalence_surcharge_rate ?? 0,
             }))
-            : [{ id: `item_${Date.now()}`, description: '', quantity: 1, unit_price: 0, tax_rate: 21, subtotal: 0, tax_amount: 0, total: 0 }]
+            : [{ id: `item_${Date.now()}`, description: '', quantity: 1, unit_price: 0, tax_rate: 21, equivalence_surcharge_rate: 0, subtotal: 0, tax_amount: 0, equivalence_surcharge_amount: 0, total: 0 }]
     );
 
     const [form, setForm] = useState({
@@ -30,15 +24,18 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
         project_id: initialData?.project_id || '',
         issue_date: formatDate(initialData?.issue_date),
         due_date:   formatDate(initialData?.due_date),
-        status:     initialData?.status     || 'draft',
         notes:      initialData?.notes      || '',
+        invoice_kind: initialData?.invoice_kind || 'complete',
+        irpf_rate: initialData?.irpf_rate ?? 0,
     });
 
     const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
     const subtotal = items.reduce((s, i) => s + Number(i.subtotal   || 0), 0);
     const taxTotal = items.reduce((s, i) => s + Number(i.tax_amount || 0), 0);
-    const total    = subtotal + taxTotal;
+    const reTotal  = items.reduce((s, i) => s + Number(i.equivalence_surcharge_amount || 0), 0);
+    const irpf     = Math.round(subtotal * Number(form.irpf_rate || 0) / 100 * 100) / 100;
+    const total    = Math.round((subtotal + taxTotal + reTotal - irpf) * 100) / 100;
 
     const handleSubmit = e => {
         e.preventDefault();
@@ -69,8 +66,7 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
                 </div>
             </div>
 
-            {/* Fechas + Estado */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                     <label className="form-label" htmlFor="invoice_issue_date">Fecha de emisión <span style={{ color: 'var(--error)', marginLeft: 3 }}>*</span></label>
                     <input id="invoice_issue_date" type="date" name="issue_date" value={form.issue_date} onChange={set} className="form-input" required />
@@ -79,8 +75,26 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
                     <label className="form-label" htmlFor="invoice_due_date">Fecha de vencimiento</label>
                     <input id="invoice_due_date" type="date" name="due_date" value={form.due_date} onChange={set} className="form-input" />
                 </div>
-                <Select label="Estado" name="status" value={form.status} onChange={set} options={STATUS_OPTIONS} />
+                <div className="form-group">
+                    <label className="form-label" htmlFor="invoice_kind">Tipo</label>
+                    <select id="invoice_kind" name="invoice_kind" value={form.invoice_kind} onChange={set} className="form-select">
+                        <option value="complete">Completa</option>
+                        <option value="simplified">Simplificada</option>
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label className="form-label" htmlFor="irpf_rate">Retención IRPF</label>
+                    <select id="irpf_rate" name="irpf_rate" value={form.irpf_rate} onChange={set} className="form-select">
+                        <option value={0}>0%</option>
+                        <option value={7}>7%</option>
+                        <option value={15}>15%</option>
+                    </select>
+                </div>
             </div>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+                Se guarda como borrador. El número oficial se asigna al pulsar Emitir.
+                {form.invoice_kind === 'complete' ? ' La factura completa pide NIF y domicilio del cliente.' : ' La simplificada no exige NIF del cliente.'}
+            </p>
 
             {/* Líneas con generador IA */}
             <div>
@@ -95,6 +109,8 @@ export default function InvoiceForm({ clients, projects, services = [], onSubmit
                     {[
                         { label: 'Base imponible', value: fmt(subtotal), color: 'var(--text-primary)', bold: false },
                         { label: 'IVA total',      value: fmt(taxTotal), color: 'var(--warning)',      bold: false },
+                        ...(reTotal ? [{ label: 'Recargo de equivalencia', value: fmt(reTotal), color: 'var(--text-primary)', bold: false }] : []),
+                        ...(irpf ? [{ label: `IRPF ${form.irpf_rate}%`, value: `-${fmt(irpf)}`, color: 'var(--text-primary)', bold: false }] : []),
                         { label: 'TOTAL',          value: fmt(total),    color: 'var(--primary)',      bold: true  },
                     ].map(row => (
                         <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>

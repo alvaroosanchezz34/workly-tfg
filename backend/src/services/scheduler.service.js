@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { pool } from '../config/db.js';
 import { sendInvoiceEmail } from './email.service.js';
 import { processRecurringExpenses } from '../controllers/recurringExpenses.controller.js';
+import { issuerKeyFor } from './invoicing/numbering.js';
+import { appendInvoiceEvent } from './invoicing/invoiceEvents.js';
 
 /**
  * Inicializa todos los jobs programados.
@@ -33,7 +35,7 @@ const markOverdueInvoices = async () => {
         const [result] = await pool.query(
             `UPDATE invoices
              SET status = 'overdue'
-             WHERE status IN ('draft','sent')
+             WHERE status = 'sent'
                AND due_date < CURDATE()
                AND is_deleted = 0`
         );
@@ -121,7 +123,7 @@ const sendUpcomingDueReminders = async () => {
              FROM invoices i
              JOIN clients c ON c.id = i.client_id
              JOIN users   u ON u.id = i.user_id
-             WHERE i.status IN ('sent', 'draft')
+             WHERE i.status = 'sent'
                AND i.is_deleted = 0
                AND c.email IS NOT NULL AND c.email != ''
                AND DATEDIFF(i.due_date, CURDATE()) IN (3, 1)
@@ -405,32 +407,29 @@ const processRecurringInvoices = async () => {
     }
 };
 
+const madridDate = date => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(date);
+
 const generateFromRecurring = async rec => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
 
-        const [[settings]] = await conn.query(
-            `SELECT * FROM invoice_settings WHERE user_id = ? FOR UPDATE`, [rec.user_id]
-        );
-        const cfg = settings || { prefix: 'FAC', next_number: 1, padding: 4 };
-        const year = new Date().getFullYear();
-        const seq  = cfg.next_number;
-        const num  = `${cfg.prefix}-${year}-${String(seq).padStart(cfg.padding, '0')}`;
-
         const issueDate = new Date();
-        const dueDate   = new Date();
+        const dueDate   = new Date(issueDate);
         dueDate.setDate(dueDate.getDate() + 30);
 
         const publicToken = crypto.randomBytes(32).toString('hex');
+        const issuerKey = issuerKeyFor({ id: rec.user_id, company_id: rec.company_id });
         const [result] = await conn.query(
             `INSERT INTO invoices
-             (user_id, client_id, project_id, invoice_number, invoice_seq, invoice_year,
+             (user_id, company_id, client_id, project_id, issuer_key, invoice_number,
               issue_date, due_date, status, subtotal_amount, tax_amount, total_amount, notes, public_token)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [rec.user_id, rec.client_id, rec.project_id, num, seq, year,
-             issueDate.toISOString().split('T')[0],
-             dueDate.toISOString().split('T')[0],
+            [rec.user_id, rec.company_id || null, rec.client_id, rec.project_id, issuerKey, null,
+             madridDate(issueDate),
+             madridDate(dueDate),
              'draft', rec.subtotal_amount, rec.tax_amount, rec.total_amount,
              `Generada automáticamente desde factura recurrente #${rec.id}`,
              publicToken]
@@ -453,15 +452,15 @@ const generateFromRecurring = async rec => {
 
         await conn.query(
             `UPDATE recurring_invoices SET next_date = ?, last_generated = NOW(), status = ? WHERE id = ?`,
-            [nextDate.toISOString().split('T')[0], finished ? 'finished' : 'active', rec.id]
+            [madridDate(nextDate), finished ? 'finished' : 'active', rec.id]
         );
-
-        await conn.query(
-            `UPDATE invoice_settings SET next_number = next_number + 1 WHERE user_id = ?`, [rec.user_id]
-        );
+        await appendInvoiceEvent(conn, {
+            invoiceId, issuerKey, userId: rec.user_id, action: 'draft_created',
+            payload: { source: 'recurring', recurring_id: rec.id },
+        });
 
         await conn.commit();
-        console.log(`[Scheduler] Factura recurrente generada: ${num}`);
+        console.log(`[Scheduler] Borrador recurrente generado: ${invoiceId}`);
     } catch (err) {
         await conn.rollback();
         throw err;

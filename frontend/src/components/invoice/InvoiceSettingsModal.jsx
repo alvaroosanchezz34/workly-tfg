@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
 import Modal from '../Modal';
-import { getInvoiceSettings, updateInvoiceSettings } from '../../api/invoices';
+import { getInvoiceSettings, updateInvoiceSettings, getIssuerProfile, saveIssuerProfile } from '../../api/invoices';
 import { CheckCircle } from 'lucide-react';
 
 export default function InvoiceSettingsModal({ token, onClose }) {
     const [cfg,     setCfg]     = useState({ prefix: 'FAC', padding: 4, reset_yearly: 1, next_number: 1, current_year: new Date().getFullYear() });
+    const [issuer,  setIssuer]  = useState({ legal_name: '', tax_id: '', fiscal_address: '' });
     const [loading, setLoading] = useState(true);
     const [saving,  setSaving]  = useState(false);
     const [success, setSuccess] = useState(false);
+    const [error,   setError]   = useState('');
 
     useEffect(() => {
-        getInvoiceSettings(token)
-            .then(setCfg)
+        Promise.all([getInvoiceSettings(token), getIssuerProfile(token).catch(() => null)])
+            .then(([settings, profile]) => {
+                setCfg(settings);
+                if (profile) setIssuer({
+                    legal_name: profile.legal_name || '',
+                    tax_id: profile.tax_id || '',
+                    fiscal_address: profile.fiscal_address || '',
+                });
+            })
             .finally(() => setLoading(false));
     }, [token]);
 
@@ -20,13 +29,19 @@ export default function InvoiceSettingsModal({ token, onClose }) {
         setCfg(f => ({ ...f, [e.target.name]: val }));
     };
 
+    const setIssuerField = e => setIssuer(f => ({ ...f, [e.target.name]: e.target.value }));
+
     const handleSave = async e => {
         e.preventDefault();
         setSaving(true);
+        setError('');
         try {
+            await saveIssuerProfile(token, issuer);
             await updateInvoiceSettings(token, { prefix: cfg.prefix, padding: cfg.padding, reset_yearly: cfg.reset_yearly });
             setSuccess(true);
             setTimeout(() => setSuccess(false), 2500);
+        } catch (err) {
+            setError(err.message);
         } finally { setSaving(false); }
     };
 
@@ -35,7 +50,7 @@ export default function InvoiceSettingsModal({ token, onClose }) {
     const preview = `${cfg.prefix || 'FAC'}-${year}-${padded}`;
 
     return (
-        <Modal open title="Configuración de numeración" onClose={onClose}>
+        <Modal open title="Datos fiscales y numeración" onClose={onClose}>
             {loading ? (
                 <div style={{ padding: '20px 0' }}><div className="skeleton" style={{ height: 14, width: '60%' }} /></div>
             ) : (
@@ -47,6 +62,20 @@ export default function InvoiceSettingsModal({ token, onClose }) {
                             <span>Configuración guardada</span>
                         </div>
                     )}
+                    {error && <div className="alert alert-danger">{error}</div>}
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Nombre o razón social</label>
+                        <input name="legal_name" className="form-input" value={issuer.legal_name} onChange={setIssuerField} placeholder="Ana López o Mi Empresa SL" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">NIF del emisor</label>
+                        <input name="tax_id" className="form-input" value={issuer.tax_id} onChange={setIssuerField} placeholder="12345678Z" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Domicilio fiscal</label>
+                        <input name="fiscal_address" className="form-input" value={issuer.fiscal_address} onChange={setIssuerField} placeholder="Calle, número, código postal y municipio" />
+                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
@@ -79,7 +108,7 @@ export default function InvoiceSettingsModal({ token, onClose }) {
                             {preview}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
-                            Próxima factura: nº {cfg.next_number}
+                            El número se asigna al emitir, seguido y sin huecos, para este emisor y esta serie.
                         </div>
                     </div>
 

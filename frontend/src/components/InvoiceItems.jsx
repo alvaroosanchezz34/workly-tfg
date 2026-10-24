@@ -11,14 +11,29 @@ const TAX_PRESETS = [
     { value: 21,  label: '21% (General)'  },
 ];
 
+const RE_PRESETS = [
+    { value: 0, label: '0%' },
+    { value: 0.5, label: '0,5%' },
+    { value: 1.4, label: '1,4%' },
+    { value: 5.2, label: '5,2%' },
+];
+
 export default function InvoiceItems({ items, setItems, services = [] }) {
     const [serviceOpen, setServiceOpen] = useState(null); // índice del item con picker abierto
 
     const recalc = item => {
         const subtotal   = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
-        const taxRate    = Number(item.tax_rate)  || 0;
+        const taxRate    = Number(item.tax_rate) || 0;
+        const reRate     = Number(item.equivalence_surcharge_rate) || 0;
         const taxAmount  = Math.round(subtotal * taxRate / 100 * 100) / 100;
-        return { ...item, subtotal, tax_amount: taxAmount, total: subtotal + taxAmount };
+        const reAmount   = Math.round(subtotal * reRate / 100 * 100) / 100;
+        return {
+            ...item,
+            subtotal,
+            tax_amount: taxAmount,
+            equivalence_surcharge_amount: reAmount,
+            total: Math.round((subtotal + taxAmount + reAmount) * 100) / 100,
+        };
     };
 
     const updateItem = (id, field, value) => {
@@ -28,7 +43,7 @@ export default function InvoiceItems({ items, setItems, services = [] }) {
     };
 
     const addItem = () =>
-        setItems(prev => [...prev, { id: genId(), description: '', quantity: 1, unit_price: 0, tax_rate: 21, subtotal: 0, tax_amount: 0, total: 0 }]);
+        setItems(prev => [...prev, { id: genId(), description: '', quantity: 1, unit_price: 0, tax_rate: 21, equivalence_surcharge_rate: 0, subtotal: 0, tax_amount: 0, equivalence_surcharge_amount: 0, total: 0 }]);
 
     const removeItem = id => setItems(prev => prev.filter(i => i.id !== id));
 
@@ -48,16 +63,16 @@ export default function InvoiceItems({ items, setItems, services = [] }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {/* Cabecera */}
             {items.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 90px 80px 80px 28px', gap: 6, padding: '6px 10px', background: 'var(--bg)', borderRadius: 6 }}>
-                    {['Descripción', 'Cant.', 'Precio/u.', 'IVA%', 'IVA €', 'Total', ''].map((h, i) => (
-                        <span key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-disabled)', textTransform: 'uppercase', textAlign: i >= 1 && i <= 5 ? 'right' : 'left' }}>{h}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 88px 92px 72px 64px 72px 28px', gap: 6, padding: '6px 10px', background: 'var(--bg)', borderRadius: 6 }}>
+                    {['Descripción', 'Cant.', 'Precio/u.', 'IVA%', 'RE%', 'IVA €', 'Total', ''].map((h, i) => (
+                        <span key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-disabled)', textTransform: 'uppercase', textAlign: i >= 1 && i <= 6 ? 'right' : 'left' }}>{h}</span>
                     ))}
                 </div>
             )}
 
             {/* Filas */}
             {items.map(item => (
-                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 90px 80px 80px 28px', gap: 6, alignItems: 'center', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card-bg)', position: 'relative' }}>
+                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 88px 92px 72px 64px 72px 28px', gap: 6, alignItems: 'center', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card-bg)', position: 'relative' }}>
 
                     {/* Descripción + selector de servicio */}
                     <div style={{ position: 'relative' }}>
@@ -109,7 +124,7 @@ export default function InvoiceItems({ items, setItems, services = [] }) {
                     </div>
 
                     {/* Cantidad */}
-                    <input type="number" min="0" step="0.01" className="form-input"
+                    <input type="number" step="0.01" className="form-input"
                         style={{ fontSize: 12.5, textAlign: 'right' }}
                         value={item.quantity}
                         onChange={e => updateItem(item.id, 'quantity', e.target.value)} />
@@ -127,6 +142,17 @@ export default function InvoiceItems({ items, setItems, services = [] }) {
                         onChange={e => updateItem(item.id, 'tax_rate', e.target.value)}
                     >
                         {TAX_PRESETS.map(t => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                    </select>
+
+                    <select className="form-select"
+                        style={{ fontSize: 12, textAlign: 'right' }}
+                        title="Recargo de equivalencia"
+                        value={item.equivalence_surcharge_rate || 0}
+                        onChange={e => updateItem(item.id, 'equivalence_surcharge_rate', e.target.value)}
+                    >
+                        {RE_PRESETS.map(t => (
                             <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
                     </select>

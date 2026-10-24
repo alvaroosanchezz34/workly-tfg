@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS clients (
   company     VARCHAR(150),
   notes       TEXT,
   document    VARCHAR(100),
+  address     TEXT,
 
   is_deleted  TINYINT(1) DEFAULT 0,
   deleted_at  DATETIME DEFAULT NULL,
@@ -224,6 +225,39 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
 );
 
 -- ══════════════════════════════════════════════════════════
+-- PERFIL FISCAL DEL EMISOR (NIF, nombre, domicilio)
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS issuer_profiles (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  issuer_key      VARCHAR(40)  NOT NULL,
+  user_id         INT          NULL,
+  company_id      INT          NULL,
+  legal_name      VARCHAR(200) NOT NULL,
+  tax_id          VARCHAR(20)  NOT NULL,
+  fiscal_address  TEXT         NOT NULL,
+  created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_issuer_profile (issuer_key),
+  CONSTRAINT fk_issuer_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_issuer_company
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT
+);
+
+-- ══════════════════════════════════════════════════════════
+-- CONTADOR POR EMISOR Y SERIE
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS invoice_series (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  issuer_key   VARCHAR(40) NOT NULL,
+  series_code  VARCHAR(20) NOT NULL,
+  year         INT         NOT NULL,
+  next_number  INT         NOT NULL DEFAULT 1,
+  padding      INT         NOT NULL DEFAULT 4,
+  UNIQUE KEY uq_invoice_series (issuer_key, series_code, year)
+);
+
+-- ══════════════════════════════════════════════════════════
 -- INVOICES
 -- ══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS invoices (
@@ -233,17 +267,23 @@ CREATE TABLE IF NOT EXISTS invoices (
   project_id       BIGINT DEFAULT NULL,
   company_id       INT    DEFAULT NULL,
 
-  invoice_number   VARCHAR(50) NOT NULL UNIQUE,
-  invoice_seq      INT         DEFAULT 1,
-  invoice_year     INT         DEFAULT (YEAR(CURDATE())),
-  invoice_prefix   VARCHAR(20) DEFAULT 'FAC',
+  issuer_key       VARCHAR(40) DEFAULT NULL,
+  series_code      VARCHAR(20) DEFAULT NULL,
+
+  invoice_number   VARCHAR(50) DEFAULT NULL,
+  invoice_seq      INT         DEFAULT NULL,
+  invoice_year     INT         DEFAULT NULL,
+  invoice_prefix   VARCHAR(20) DEFAULT NULL,
 
   issue_date       DATE NOT NULL,
   due_date         DATE NOT NULL,
-  status           ENUM('draft','sent','paid','overdue') DEFAULT 'draft',
+  status           ENUM('draft','sent','paid','overdue','void') DEFAULT 'draft',
 
   subtotal_amount  DECIMAL(10,2) DEFAULT 0,
   tax_amount       DECIMAL(10,2) DEFAULT 0,
+  equivalence_surcharge_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  irpf_rate        DECIMAL(5,2) NOT NULL DEFAULT 0,
+  irpf_amount      DECIMAL(10,2) NOT NULL DEFAULT 0,
   total_amount     DECIMAL(10,2) DEFAULT 0,
   paid_amount      DECIMAL(10,2) DEFAULT 0,
   payment_status   ENUM('unpaid','partial','paid') DEFAULT 'unpaid',
@@ -252,7 +292,26 @@ CREATE TABLE IF NOT EXISTS invoices (
   paid_at          DATETIME DEFAULT NULL,
   public_token     VARCHAR(100) DEFAULT NULL,
 
+  issuer_legal_name      VARCHAR(200) DEFAULT NULL,
+  issuer_tax_id          VARCHAR(20)  DEFAULT NULL,
+  issuer_fiscal_address  TEXT         DEFAULT NULL,
+  customer_legal_name    VARCHAR(200) DEFAULT NULL,
+  customer_tax_id        VARCHAR(32)  DEFAULT NULL,
+  customer_fiscal_address TEXT        DEFAULT NULL,
+  issued_at              DATETIME DEFAULT NULL,
+  voided_at              DATETIME DEFAULT NULL,
+  void_reason            TEXT DEFAULT NULL,
+  verifactu_status       VARCHAR(40) DEFAULT NULL,
+  verifactu_external_id  VARCHAR(100) DEFAULT NULL,
+  verifactu_qr_url       TEXT DEFAULT NULL,
+  verifactu_legend       VARCHAR(120) DEFAULT NULL,
+
   notes            TEXT,
+  invoice_kind     ENUM('complete','simplified') NOT NULL DEFAULT 'complete',
+  invoice_type     ENUM('normal','rectificativa') NOT NULL DEFAULT 'normal',
+  rectification_method ENUM('substitution','difference') DEFAULT NULL,
+  rectifies_invoice_id BIGINT DEFAULT NULL,
+  rectified_by_invoice_id BIGINT DEFAULT NULL,
 
   is_deleted       TINYINT(1) DEFAULT 0,
   deleted_at       DATETIME DEFAULT NULL,
@@ -260,10 +319,12 @@ CREATE TABLE IF NOT EXISTS invoices (
 
   created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
 
+  UNIQUE KEY uq_invoice_issuer_series_number (issuer_key, series_code, invoice_number),
+
   CONSTRAINT fk_invoices_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT fk_invoices_client
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE RESTRICT,
   CONSTRAINT fk_invoices_project
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_invoices_company
@@ -282,8 +343,10 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   quantity     DECIMAL(10,2) NOT NULL,
   unit_price   DECIMAL(10,2) NOT NULL,
   tax_rate     DECIMAL(5,2)  DEFAULT 21,
+  equivalence_surcharge_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
   subtotal     DECIMAL(10,2) NOT NULL,
   tax_amount   DECIMAL(10,2) DEFAULT 0,
+  equivalence_surcharge_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
   total        DECIMAL(10,2) NOT NULL,
 
   is_deleted   TINYINT(1) DEFAULT 0,
@@ -291,9 +354,25 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   deleted_by   INT DEFAULT NULL,
 
   CONSTRAINT fk_invoice_items_invoice
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE RESTRICT,
   CONSTRAINT fk_invoice_items_deleted_by
     FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Bitácora de la factura. Solo se insertan filas; la aplicación no las borra.
+CREATE TABLE IF NOT EXISTS invoice_events (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  invoice_id  BIGINT       NOT NULL,
+  issuer_key  VARCHAR(40)  NULL,
+  user_id     INT          NULL,
+  action      VARCHAR(40)  NOT NULL,
+  payload     JSON         NULL,
+  created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_invoice_events_invoice
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_invoice_events_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  INDEX idx_invoice_events_invoice (invoice_id, id)
 );
 
 -- ══════════════════════════════════════════════════════════
@@ -311,7 +390,7 @@ CREATE TABLE IF NOT EXISTS invoice_payments (
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_payments_invoice
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE RESTRICT,
   CONSTRAINT fk_payments_user
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -399,7 +478,7 @@ CREATE TABLE IF NOT EXISTS credit_notes (
   CONSTRAINT fk_cn_user
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_cn_invoice
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE RESTRICT,
   CONSTRAINT fk_cn_company
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
 );

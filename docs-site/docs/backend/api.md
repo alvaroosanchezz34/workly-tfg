@@ -35,7 +35,7 @@ Limitador de rate aplicado: **20 peticiones / 15 minutos** por IP.
 | `POST` | `/clients` | ✅ | Free: máx 5 | Crear cliente |
 | `GET` | `/clients/:id` | ✅ | Any | Obtener cliente por ID |
 | `PUT` | `/clients/:id` | ✅ | Any | Actualizar cliente |
-| `DELETE` | `/clients/:id` | ✅ | Any | Baja lógica (soft delete) |
+| `DELETE` | `/clients/:id` | ✅ | Any | Baja lógica. Responde 409 si el cliente tiene facturas emitidas |
 | `GET` | `/clients/deleted` | ✅ | Any | Listar clientes eliminados |
 | `PUT` | `/clients/:id/restore` | ✅ | Any | Restaurar cliente eliminado |
 
@@ -63,9 +63,15 @@ Limitador de rate aplicado: **20 peticiones / 15 minutos** por IP.
 | `GET` | `/invoices/settings` | ✅ | Any | Obtener configuración de facturas |
 | `PUT` | `/invoices/settings` | ✅ | Any | Actualizar configuración de facturas |
 | `GET` | `/invoices/:id` | ✅ | Any | Obtener factura por ID |
-| `PUT` | `/invoices/:id` | ✅ | Any | Actualizar factura |
-| `DELETE` | `/invoices/:id` | ✅ | Any | Baja lógica |
-| `PATCH` | `/invoices/:id/status` | ✅ | Any | Cambiar estado (draft/sent/paid…) |
+| `GET` | `/invoices/issuer` | ✅ | Any | Perfil fiscal del emisor |
+| `PUT` | `/invoices/issuer` | ✅ | Admin de empresa o autónomo | Guardar NIF, nombre y domicilio fiscal |
+| `PUT` | `/invoices/:id` | ✅ | Any | Actualizar un borrador. Una factura emitida responde 409 |
+| `DELETE` | `/invoices/:id` | ✅ | Any | Elimina solo borradores. Una emitida se anula |
+| `POST` | `/invoices/:id/issue` | ✅ | Any | Emite, asigna número y llama al proveedor VeriFactu |
+| `POST` | `/invoices/:id/void` | ✅ | Any | Anula una factura emitida. Body: `{ "reason": "..." }` |
+| `POST` | `/invoices/:id/rectify` | ✅ | Any | Abre una rectificativa en borrador. Body: `{ "method": "substitution" \| "difference" }` |
+| `GET` | `/invoices/:id/events` | ✅ | Any | Bitácora de la factura |
+| `PATCH` | `/invoices/:id/status` | ✅ | Any | Cambia el cobro de una factura ya emitida (sent/paid/overdue). No emite ni anula |
 | `GET` | `/invoices/:id/pdf` | ✅ | Any | Descargar PDF de la factura |
 | `POST` | `/invoices/:id/send` | ✅ | **Pro+** | Enviar factura por email |
 | `GET` | `/invoices/:id/payments` | ✅ | Any | Listar pagos de la factura |

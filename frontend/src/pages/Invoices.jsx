@@ -21,6 +21,7 @@ import {
     getInvoices, getInvoiceById, createInvoice, updateInvoice,
     deleteInvoice, downloadInvoicePDF, updateInvoiceStatus, getInvoiceStats,
     sendInvoiceByEmail, bulkDeleteInvoices, bulkUpdateInvoiceStatus,
+    issueInvoice, voidInvoice, rectifyInvoice,
 } from '../api/invoices';
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
@@ -33,9 +34,10 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit
 
 const INV_STATUS = {
     draft:   { label: 'Borrador', cls: 'badge badge-draft'   },
-    sent:    { label: 'Enviada',  cls: 'badge badge-sent'    },
+    sent:    { label: 'Emitida',  cls: 'badge badge-sent'    },
     paid:    { label: 'Pagada',   cls: 'badge badge-paid'    },
     overdue: { label: 'Vencida',  cls: 'badge badge-overdue' },
+    void:    { label: 'Anulada',  cls: 'badge badge-overdue' },
 };
 const PAY_STATUS = {
     unpaid:  { label: 'Sin pagar', color: 'var(--error)'     },
@@ -43,11 +45,13 @@ const PAY_STATUS = {
     paid:    { label: 'Cobrado',   color: 'var(--secondary)'  },
 };
 const STATUS_TRANSITIONS = {
-    draft:   ['sent', 'paid', 'overdue'],
-    sent:    ['paid', 'overdue', 'draft'],
+    draft:   [],
+    sent:    ['paid', 'overdue'],
     overdue: ['paid', 'sent'],
     paid:    [],
+    void:    [],
 };
+const invoiceLabel = inv => inv?.invoice_number || 'Borrador';
 const TABS = ['facturas', 'presupuestos', 'recurrentes', 'notas-credito'];
 const TAB_LABEL = { facturas: 'Facturas', presupuestos: 'Presupuestos', recurrentes: 'Recurrentes', 'notas-credito': 'Notas de crédito' };
 
@@ -99,7 +103,7 @@ function InvoicePreview({ invoice }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                         <div style={{ fontSize: 10, opacity: .65, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>FACTURA</div>
-                        <div style={{ fontSize: 22, fontWeight: 800 }}>{invoice.invoice_number}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800 }}>{invoiceLabel(invoice)}</div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 12, opacity: .8 }}>
                         <div>Emisión: {fmtD(invoice.issue_date)}</div>
@@ -112,7 +116,8 @@ function InvoicePreview({ invoice }) {
                 <div style={{ fontWeight: 700 }}>{invoice.client_name}</div>
                 {invoice.client_company  && <div style={{ color: 'var(--text-secondary)' }}>{invoice.client_company}</div>}
                 {invoice.client_email    && <div style={{ color: 'var(--text-secondary)' }}>{invoice.client_email}</div>}
-                {invoice.client_document && <div style={{ color: 'var(--text-disabled)' }}>NIF: {invoice.client_document}</div>}
+                {invoice.client_document && <div style={{ color: 'var(--text-disabled)' }}>NIF: {invoice.customer_tax_id || invoice.client_document}</div>}
+                {(invoice.customer_fiscal_address || invoice.client_address) && <div style={{ color: 'var(--text-secondary)' }}>{invoice.customer_fiscal_address || invoice.client_address}</div>}
             </div>
             <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, minWidth: 400 }}>
@@ -142,6 +147,8 @@ function InvoicePreview({ invoice }) {
                     {[
                         { label: 'Base imponible', value: fmt(invoice.subtotal_amount), bold: false },
                         { label: 'IVA',            value: fmt(invoice.tax_amount),      bold: false },
+                        ...(Number(invoice.equivalence_surcharge_amount) ? [{ label: 'Recargo de equivalencia', value: fmt(invoice.equivalence_surcharge_amount), bold: false }] : []),
+                        ...(Number(invoice.irpf_amount) ? [{ label: `IRPF ${invoice.irpf_rate}%`, value: `-${fmt(invoice.irpf_amount)}`, bold: false }] : []),
                         { label: 'TOTAL',          value: fmt(invoice.total_amount),    bold: true  },
                     ].map(row => (
                         <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -151,6 +158,11 @@ function InvoicePreview({ invoice }) {
                     ))}
                 </div>
             </div>
+            {invoice.verifactu_legend && (
+                <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 12.5 }}>
+                    <strong>QR tributario: </strong>{invoice.verifactu_legend}
+                </div>
+            )}
             {invoice.notes && (
                 <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
                     <strong style={{ color: 'var(--text-primary)' }}>Notas: </strong>{invoice.notes}
@@ -190,6 +202,10 @@ export default function Invoices() {
     const [sendOk,       setSendOk]       = useState('');
     const [selectedIds,  setSelectedIds]  = useState([]);
     const [bulkBusy,     setBulkBusy]     = useState(false);
+    const [fiscal,       setFiscal]       = useState(null);
+    const [voidReason,   setVoidReason]   = useState('');
+    const [rectifyMethod, setRectifyMethod] = useState('substitution');
+    const [fiscalBusy,   setFiscalBusy]   = useState(false);
 
     const [filters, setFilters] = useState({
         status: '', client_id: '', date_from: '', date_to: '', min_amount: '', max_amount: '',
@@ -224,16 +240,54 @@ export default function Invoices() {
         catch { alert('Error al cargar estadísticas'); }
     };
 
-    const handleEdit   = async inv => { const full = await getInvoiceById(token, inv.id); setEditing(full); setShowForm(true); };
-    const handleSubmit = async data => { if (data.id) await updateInvoice(token, data.id, data); else await createInvoice(token, data); setShowForm(false); setEditing(null); load(); };
-    const handleDelete = async () => { await deleteInvoice(token, toDelete.id); setToDelete(null); load(); };
+    const handleEdit   = async inv => {
+        if (inv.status && inv.status !== 'draft') return alert('Una factura emitida no se edita. Puedes anularla o crear una rectificativa.');
+        const full = await getInvoiceById(token, inv.id);
+        setEditing(full); setShowForm(true);
+    };
+    const handleSubmit = async data => {
+        try {
+            if (data.id) await updateInvoice(token, data.id, data);
+            else await createInvoice(token, data);
+            setShowForm(false); setEditing(null); load();
+        } catch (err) { alert(err.message); }
+    };
+    const handleDelete = async () => {
+        const res = await deleteInvoice(token, toDelete.id);
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert(data.message || 'No se pudo eliminar');
+            return;
+        }
+        setToDelete(null); load();
+    };
     const closeForm    = () => { setShowForm(false); setEditing(null); };
-    const handleStatusChange = async (id, status) => { await updateInvoiceStatus(token, id, status); load(); };
+    const handleStatusChange = async (id, status) => {
+        try { await updateInvoiceStatus(token, id, status); load(); }
+        catch (err) { alert(err.message); }
+    };
+    const openFiscal = (type, invoice) => {
+        setVoidReason('');
+        setRectifyMethod('substitution');
+        setFiscal({ type, invoice });
+    };
+    const handleFiscal = async () => {
+        if (!fiscal) return;
+        setFiscalBusy(true);
+        try {
+            if (fiscal.type === 'issue') await issueInvoice(token, fiscal.invoice.id);
+            else if (fiscal.type === 'void') await voidInvoice(token, fiscal.invoice.id, voidReason.trim());
+            else await rectifyInvoice(token, fiscal.invoice.id, rectifyMethod);
+            setFiscal(null);
+            load();
+        } catch (err) { alert(err.message); }
+        finally { setFiscalBusy(false); }
+    };
 
     const toggleSelect = id => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
     const toggleSelectAll = () => setSelectedIds(ids => ids.length === invoices.length ? [] : invoices.map(i => i.id));
     const handleBulkDelete = async () => {
-        if (!confirm(`¿Eliminar ${selectedIds.length} factura(s)? Las facturas pagadas se omitirán.`)) return;
+        if (!confirm(`¿Eliminar ${selectedIds.length} factura(s)? Solo se borran los borradores. Las emitidas se omiten.`)) return;
         setBulkBusy(true);
         try { const res = await bulkDeleteInvoices(token, selectedIds); alert(res.message); load(); }
         finally { setBulkBusy(false); }
@@ -260,8 +314,8 @@ export default function Invoices() {
     const handleSendEmail = async () => {
         if (!sendEmail.trim()) return alert('Introduce un email destinatario');
         setSending(true);
-        try { const data = await sendInvoiceByEmail(token, showSend.id, sendEmail.trim()); if (data.message?.toLowerCase().includes('error')) throw new Error(data.message); setSendOk(data.message); load(); }
-        catch (err) { alert(`Error: ${err.message}`); }
+        try { const data = await sendInvoiceByEmail(token, showSend.id, sendEmail.trim()); setSendOk(data.message); load(); }
+        catch (err) { alert(err.message); }
         finally { setSending(false); }
     };
 
@@ -323,7 +377,6 @@ export default function Invoices() {
                             <div style={{ display:'flex', alignItems:'center', gap:10, background:'var(--primary-light)', border:'1px solid var(--primary)', borderRadius:8, padding:'8px 14px', marginBottom:14, flexWrap:'wrap' }}>
                                 <span style={{ fontSize:13, fontWeight:600, color:'var(--primary)' }}>{selectedIds.length} seleccionada{selectedIds.length !== 1 ? 's' : ''}</span>
                                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginLeft:'auto' }}>
-                                    <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => handleBulkStatus('sent')}>Marcar enviada</button>
                                     <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => handleBulkStatus('paid')}>Marcar pagada</button>
                                     <button className="btn btn-danger btn-sm" disabled={bulkBusy} onClick={handleBulkDelete}>Eliminar</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>Cancelar</button>
@@ -364,7 +417,7 @@ export default function Invoices() {
                                                         <FileText size={13} color="var(--primary)"/>
                                                     </div>
                                                     <div>
-                                                        <div style={{ fontWeight:700, fontSize:14, fontVariantNumeric:'tabular-nums' }}>{inv.invoice_number}</div>
+                                                        <div style={{ fontWeight:700, fontSize:14, fontVariantNumeric:'tabular-nums' }}>{invoiceLabel(inv)}</div>
                                                         <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:1 }}>{inv.client_name}</div>
                                                     </div>
                                                 </div>
@@ -386,11 +439,15 @@ export default function Invoices() {
                                                 {isOverdue && ' ⚠️'}
                                             </div>
                                             {/* Acciones */}
-                                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, borderTop:'1px solid var(--border)', paddingTop:10 }}>
+                                            <div style={{ display:'flex', flexWrap:'wrap', gap:6, borderTop:'1px solid var(--border)', paddingTop:10 }}>
                                                 <button className="btn btn-ghost btn-sm" onClick={() => handlePreview(inv)}><Eye size={12}/></button>
-                                                <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(inv)}>Editar</button>
                                                 <button className="btn btn-ghost btn-sm" disabled={downloading===inv.id} onClick={() => handleDownload(inv)}><Download size={12}/></button>
-                                                <button className="btn btn-ghost btn-sm" onClick={() => openSendModal(inv)}><Send size={12}/></button>
+                                                {inv.status === 'draft' && <button className="btn btn-primary btn-sm" onClick={() => openFiscal('issue', inv)}>Emitir</button>}
+                                                {inv.status === 'draft' && <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(inv)}>Editar</button>}
+                                                {inv.status === 'draft' && <button className="btn btn-danger btn-sm" onClick={() => setToDelete(inv)}>Eliminar</button>}
+                                                {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openSendModal(inv)}><Send size={12}/></button>}
+                                                {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openFiscal('rectify', inv)}>Rectificar</button>}
+                                                {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openFiscal('void', inv)}>Anular</button>}
                                             </div>
                                         </div>
                                     );
@@ -432,7 +489,7 @@ export default function Invoices() {
                                                             <div style={{ width:28, height:28, borderRadius:6, background:'var(--primary-light)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                                                                 <FileText size={13} color="var(--primary)"/>
                                                             </div>
-                                                            <span style={{ fontWeight:600, fontSize:13, fontVariantNumeric:'tabular-nums' }}>{inv.invoice_number}</span>
+                                                            <span style={{ fontWeight:600, fontSize:13, fontVariantNumeric:'tabular-nums' }}>{invoiceLabel(inv)}</span>
                                                         </div>
                                                     </td>
                                                     <td style={{ color:'var(--text-secondary)', fontSize:13 }}>{inv.client_name}</td>
@@ -451,10 +508,13 @@ export default function Invoices() {
                                                     <td style={{ textAlign:'right', fontWeight:700, fontSize:14, fontVariantNumeric:'tabular-nums' }}>{fmt(inv.total_amount)}</td>
                                                     <td style={{ textAlign:'right', whiteSpace:'nowrap' }}>
                                                         <button className="btn-icon" title="Vista previa" onClick={() => handlePreview(inv)} style={{ display:'inline-flex', marginRight:2 }}><Eye size={13}/></button>
-                                                        <button className="action-link action-link-primary" onClick={() => handleEdit(inv)}>Editar</button>
                                                         <button className="btn-icon" title="Descargar PDF" disabled={downloading===inv.id} style={{ display:'inline-flex', verticalAlign:'middle', marginLeft:4, opacity:downloading===inv.id?0.5:1 }} onClick={() => handleDownload(inv)}><Download size={13}/></button>
-                                                        <button className="btn-icon" title="Enviar por email" style={{ display:'inline-flex', verticalAlign:'middle', marginLeft:4 }} onClick={() => openSendModal(inv)}><Send size={13}/></button>
-                                                        <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(inv)}>Eliminar</button>
+                                                        {inv.status === 'draft' && <button className="action-link action-link-primary" onClick={() => openFiscal('issue', inv)}>Emitir</button>}
+                                                        {inv.status === 'draft' && <button className="action-link action-link-primary" onClick={() => handleEdit(inv)}>Editar</button>}
+                                                        {inv.status === 'draft' && <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(inv)}>Eliminar</button>}
+                                                        {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn-icon" title="Enviar por email" style={{ display:'inline-flex', verticalAlign:'middle', marginLeft:4 }} onClick={() => openSendModal(inv)}><Send size={13}/></button>}
+                                                        {inv.status !== 'draft' && inv.status !== 'void' && <button className="action-link" onClick={() => openFiscal('rectify', inv)}>Rectificar</button>}
+                                                        {inv.status !== 'draft' && inv.status !== 'void' && <button className="action-link action-link-danger" onClick={() => openFiscal('void', inv)}>Anular</button>}
                                                     </td>
                                                 </MotionTr>
                                             );
@@ -486,7 +546,7 @@ export default function Invoices() {
 
             <Modal open={!!toDelete} title="Eliminar factura" onClose={() => setToDelete(null)}>
                 <p style={{ fontSize:14, color:'var(--text-secondary)', marginBottom:20 }}>
-                    ¿Eliminar la factura <strong style={{ color:'var(--text-primary)' }}>{toDelete?.invoice_number}</strong>? Solo se pueden eliminar facturas no pagadas.
+                    ¿Eliminar el borrador <strong style={{ color:'var(--text-primary)' }}>{invoiceLabel(toDelete)}</strong>? Una factura ya emitida no se borra: se anula.
                 </p>
                 <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
                     <button className="btn btn-ghost" onClick={() => setToDelete(null)}>Cancelar</button>
@@ -506,7 +566,39 @@ export default function Invoices() {
                 </Modal>
             )}
 
-            <Modal open={!!showSend} title={`Enviar — ${showSend?.invoice_number||''}`} onClose={() => { setShowSend(null); setSendOk(''); }}>
+            <Modal open={!!fiscal} title={fiscal?.type === 'issue' ? 'Emitir factura' : fiscal?.type === 'void' ? 'Anular factura' : 'Factura rectificativa'} onClose={() => setFiscal(null)}>
+                {fiscal?.type === 'issue' && (
+                    <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                        Se asignará el siguiente número de la serie y se guardará una copia de los datos fiscales. Después ya no se podrá editar.
+                    </p>
+                )}
+                {fiscal?.type === 'void' && (
+                    <div className="form-group" style={{ marginBottom: 20 }}>
+                        <label className="form-label">Motivo de la anulación</label>
+                        <input className="form-input" value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Por ejemplo: error en el cliente" />
+                    </div>
+                )}
+                {fiscal?.type === 'rectify' && (
+                    <div className="form-group" style={{ marginBottom: 20 }}>
+                        <label className="form-label">Método</label>
+                        <select className="form-select" value={rectifyMethod} onChange={e => setRectifyMethod(e.target.value)}>
+                            <option value="substitution">Por sustitución</option>
+                            <option value="difference">Por diferencias</option>
+                        </select>
+                        <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8 }}>
+                            Se crea un borrador nuevo. El número se asigna cuando lo emitas.
+                        </p>
+                    </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                    <button className="btn btn-ghost" onClick={() => setFiscal(null)}>Cancelar</button>
+                    <button className="btn btn-primary" disabled={fiscalBusy} onClick={handleFiscal}>
+                        {fiscalBusy ? 'Guardando…' : 'Confirmar'}
+                    </button>
+                </div>
+            </Modal>
+
+            <Modal open={!!showSend} title={`Enviar — ${invoiceLabel(showSend)}`} onClose={() => { setShowSend(null); setSendOk(''); }}>
                 {sendOk ? (
                     <div style={{ textAlign:'center', padding:'20px 0' }}>
                         <div style={{ fontSize:44, marginBottom:12 }}>✅</div>
@@ -517,7 +609,7 @@ export default function Invoices() {
                 ) : (
                     <>
                         <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:16 }}>
-                            Se enviará un email con el PDF adjunto. Si la factura está en borrador pasará a <strong>Enviada</strong> automáticamente.
+                            Se enviará un email con el PDF adjunto. El envío no cambia el número ni el estado fiscal: la factura tiene que estar emitida.
                         </p>
                         <div style={{ background:'var(--bg)', borderRadius:8, padding:'12px 16px', marginBottom:16, border:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                             <div>

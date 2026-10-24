@@ -6,7 +6,7 @@ const ClientForm = ({ initialData, onSubmit, onCancel }) => {
     const d = initialData || {};
     const [form, setForm] = useState({
         name: d.name||'', email:d.email||'', phone:d.phone||'',
-        company:d.company||'', notes:d.notes||'', document:d.document||'',
+        company:d.company||'', notes:d.notes||'', document:d.document||'', address:d.address||'',
     });
     const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
     const handleSubmit = e => { e.preventDefault(); if(!form.name.trim()) return alert('El nombre es obligatorio'); onSubmit(form); };
@@ -18,7 +18,8 @@ const ClientForm = ({ initialData, onSubmit, onCancel }) => {
                 <Input label="Email" name="email" type="email" value={form.email} onChange={set} placeholder="email@empresa.com" />
                 <Input label="Teléfono" name="phone" value={form.phone} onChange={set} placeholder="+34 600 000 000" />
                 <Input label="Empresa" name="company" value={form.company} onChange={set} placeholder="Nombre de la empresa" />
-                <Input label="DNI / NIF" name="document" value={form.document} onChange={set} placeholder="12345678A" />
+                <Input label="DNI / NIF" name="document" value={form.document} onChange={set} placeholder="12345678Z" />
+                <Input label="Domicilio fiscal" name="address" value={form.address} onChange={set} placeholder="Calle, número, código postal y municipio" />
             </div>
             <Textarea label="Notas" name="notes" value={form.notes} onChange={set} placeholder="Información adicional…" rows={3} />
             <FormFooter onCancel={onCancel} />
