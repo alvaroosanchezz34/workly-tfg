@@ -5,6 +5,7 @@ import { Select, Textarea } from '../FormComponents';
 import { getQuotes, createQuote, updateQuote, deleteQuote, convertQuote } from '../../api/quotes';
 import AISmartQuote from '../ai/AISmartQuote';
 import { Plus, FileText, ArrowRight, CheckCircle } from 'lucide-react';
+import useIsMobile from '../../hooks/useIsMobile';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -20,6 +21,7 @@ const STATUS = {
 const genId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
 function QuoteForm({ clients, projects, services, initialData, onSubmit, onCancel }) {
+    const narrow = useIsMobile(720);
     const fmt2d = d => (!d ? '' : d.split('T')[0]);
     const [form, setForm] = useState({
         client_id: initialData?.client_id || '', project_id: initialData?.project_id || '',
@@ -52,7 +54,7 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
             {/* Botón IA */}
             <AISmartQuote clients={clients} onApply={lines => setItems(lines)} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                     <label className="form-label">Cliente *</label>
                     <select name="client_id" value={form.client_id} onChange={set} className="form-select" required>
@@ -90,15 +92,16 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
                 </div>
             </div>
             <Textarea label="Notas" name="notes" value={form.notes} onChange={set} rows={2} placeholder="Condiciones, validez del presupuesto…" />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', flexDirection: narrow ? 'column-reverse' : 'row', justifyContent: 'flex-end', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                 <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Guardar presupuesto</button>
+                <button type="submit" className="btn btn-primary" style={narrow ? { width: '100%', minHeight: 48 } : undefined}>Guardar presupuesto</button>
             </div>
         </form>
     );
 }
 
 export default function QuotesTab({ token, clients, projects, services }) {
+    const isMobile = useIsMobile(720);
     const [quotes,   setQuotes]   = useState([]);
     const [loading,  setLoading]  = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -123,7 +126,10 @@ export default function QuotesTab({ token, clients, projects, services }) {
     const handleConvert = async () => {
         try {
             const result = await convertQuote(token, converting.id, convDates);
-            alert(`Factura ${result.invoice_number} creada correctamente`);
+            const number = result.invoice_number
+                ? `Factura ${result.invoice_number} creada.`
+                : 'Borrador creado. El número oficial se asigna cuando pulses Emitir, en Facturas.';
+            alert(number);
             setConverting(null); load();
         } catch (err) { alert(err.message); }
     };
@@ -141,6 +147,39 @@ export default function QuotesTab({ token, clients, projects, services }) {
                 <div className="table-wrap">{[...Array(3)].map((_, i) => <div key={i} style={{ padding: '13px 16px', borderBottom: '1px solid #F5F5F5' }}><div className="skeleton" style={{ height: 12, width: '40%', marginBottom: 8 }} /><div className="skeleton" style={{ height: 10, width: '25%' }} /></div>)}</div>
             ) : quotes.length === 0 ? (
                 <div className="table-wrap"><div className="empty-state"><div className="empty-icon"><FileText size={22} /></div><p className="empty-title">Sin presupuestos</p><p className="empty-desc">Crea presupuestos y conviértelos en facturas con un clic</p></div></div>
+            ) : isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {quotes.map(q => {
+                        const s = STATUS[q.status] || STATUS.draft;
+                        return (
+                            <div key={q.id} className="card card-p" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                                    <strong>{q.quote_number}</strong>
+                                    <span className={s.cls}><span className="badge-dot" />{s.label}</span>
+                                </div>
+                                <div style={{ fontSize: 14 }}>{q.client_name}</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)' }}>
+                                    <span>{fmtDate(q.issue_date)}</span>
+                                    <strong style={{ color: 'var(--text-primary)', fontSize: 16 }}>{fmt(q.total_amount)}</strong>
+                                </div>
+                                {!q.converted_to_invoice_id && q.status !== 'rejected' && (
+                                    <button className="btn btn-primary" style={{ width: '100%', minHeight: 48 }} onClick={() => setConverting(q)}>
+                                        <ArrowRight size={16} /> Pasar a factura
+                                    </button>
+                                )}
+                                {q.converted_to_invoice_id && (
+                                    <span style={{ fontSize: 13, color: 'var(--secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                        <CheckCircle size={14} /> Ya pasado a borrador de factura
+                                    </span>
+                                )}
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => { setEditing(q); setShowForm(true); }}>Editar</button>
+                                    <button className="btn btn-ghost" style={{ flex: 1, minHeight: 44 }} onClick={() => setToDelete(q)}>Eliminar</button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             ) : (
                 <div className="table-wrap">
                     <table className="data-table">
@@ -199,7 +238,7 @@ export default function QuotesTab({ token, clients, projects, services }) {
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
                     Se creará una factura borrador con todas las líneas del presupuesto.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
                     <div className="form-group">
                         <label className="form-label">Fecha de emisión</label>
                         <input type="date" className="form-input" value={convDates.issue_date} onChange={e => setConvDates(f => ({ ...f, issue_date: e.target.value }))} />
@@ -209,10 +248,10 @@ export default function QuotesTab({ token, clients, projects, services }) {
                         <input type="date" className="form-input" value={convDates.due_date} onChange={e => setConvDates(f => ({ ...f, due_date: e.target.value }))} />
                     </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', justifyContent: 'flex-end', gap: 10 }}>
                     <button className="btn btn-ghost" onClick={() => setConverting(null)}>Cancelar</button>
-                    <button className="btn btn-primary" onClick={handleConvert}>
-                        <ArrowRight size={14} /> Crear factura
+                    <button className="btn btn-primary" onClick={handleConvert} style={isMobile ? { width: '100%', minHeight: 48 } : undefined}>
+                        <ArrowRight size={14} /> Crear borrador de factura
                     </button>
                 </div>
             </Modal>

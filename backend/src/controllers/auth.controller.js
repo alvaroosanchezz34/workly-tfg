@@ -1,99 +1,89 @@
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { pool } from "../config/db.js";
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { createHash, randomBytes } from 'crypto';
+import { pool } from '../config/db.js';
+import { logger } from '../utils/logger.js';
 
-// REGISTRO
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const hashToken = token => createHash('sha256').update(token).digest('hex');
+
+const accessTokenFor = user => jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30m' }
+);
+
+const storeRefreshToken = async (user) => {
+    const token = jwt.sign(
+        { id: user.id, role: user.role, jti: randomBytes(16).toString('hex') },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    );
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await pool.query(
+        `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)`,
+        [user.id, hashToken(token), expires]
+    );
+    return token;
+};
+
+const fail = (res, status, message) => res.status(status).json({ message });
+
 export const register = async (req, res) => {
-    const { name, email, password } = req.body;
+    const name = String(req.body?.name || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
 
-    // Validación básica de entrada
     if (!name || !email || !password) {
-        return res.status(400).json({ message: "Todos los campos son obligatorios" });
+        return fail(res, 400, 'Todos los campos son obligatorios');
     }
-
-    if (password.length < 6) {
-        return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+    if (name.length > 100) return fail(res, 400, 'El nombre es demasiado largo');
+    if (password.length < 8) {
+        return fail(res, 400, 'La contraseña debe tener al menos 8 caracteres');
     }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: "Email no válido" });
+    if (!emailRegex.test(email) || email.length > 150) {
+        return fail(res, 400, 'Email no válido');
     }
 
     try {
-        // Comprobar si el email ya existe
-        const [existing] = await pool.query(
-            "SELECT id FROM users WHERE email = ?",
-            [email]
-        );
+        const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) return fail(res, 400, 'Email ya registrado');
 
-        if (existing.length > 0) {
-            return res.status(400).json({ message: "Email ya registrado" });
-        }
-
-        // Hash contraseña
         const hashedPassword = await bcrypt.hash(password, 12);
-
-        // FIX: el role NUNCA viene del cliente, siempre se fuerza a 'user'
         const [result] = await pool.query(
-            "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')",
+            `INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')`,
             [name, email, hashedPassword]
         );
-
         res.status(201).json({
-            message: "Usuario registrado correctamente",
+            message: 'Usuario registrado correctamente',
             userId: result.insertId,
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        logger.error('register', { message: error.message });
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
 
-// LOGIN
 export const login = async (req, res) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ message: "Email y contraseña son obligatorios" });
-    }
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (!email || !password) return fail(res, 400, 'Email y contraseña son obligatorios');
 
     try {
-        const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
-            email,
-        ]);
-
-        if (rows.length === 0) {
-            return res.status(401).json({ message: "Credenciales incorrectas" });
-        }
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (rows.length === 0) return fail(res, 401, 'Credenciales incorrectas');
 
         const user = rows[0];
-
-        // Comprobar si la cuenta está activa
-        if (user.status !== "active") {
-            return res.status(403).json({ message: "Cuenta suspendida o inactiva" });
+        if (user.status !== 'active' || user.deleted_at) {
+            return fail(res, 403, 'Cuenta suspendida o inactiva');
         }
-
         const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-            return res.status(401).json({ message: "Credenciales incorrectas" });
-        }
+        if (!validPassword) return fail(res, 401, 'Credenciales incorrectas');
 
-        // Actualizar last_login
-        await pool.query("UPDATE users SET last_login = NOW() WHERE id = ?", [user.id]);
-
-        // Crear tokens
-        const accessToken = jwt.sign(
-            { id: user.id, role: user.role },   // siempre incluir role
-            process.env.JWT_SECRET,
-            { expiresIn: "30m" }
-        );
-
-        const refreshToken = jwt.sign(
-            { id: user.id, role: user.role },   // FIX: incluir role también aquí
-            process.env.JWT_REFRESH_SECRET,
-            { expiresIn: "7d" }
-        );
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+        const accessToken = accessTokenFor(user);
+        const refreshToken = await storeRefreshToken(user);
 
         res.json({
             accessToken,
@@ -109,34 +99,56 @@ export const login = async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        logger.error('login', { message: error.message });
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
 
-// REFRESH TOKEN
 export const refreshToken = async (req, res) => {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-        return res.status(401).json({ message: "Refresh token requerido" });
-    }
+    const token = req.body?.refreshToken;
+    if (!token) return fail(res, 401, 'Refresh token requerido');
 
     try {
-        const decoded = jwt.verify(
-            refreshToken,
-            process.env.JWT_REFRESH_SECRET
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+        const [[stored]] = await pool.query(
+            `SELECT id, user_id, revoked_at, expires_at FROM refresh_tokens WHERE token_hash = ?`,
+            [hashToken(token)]
         );
-
-        // FIX: propagar el role al nuevo accessToken
-        const newAccessToken = jwt.sign(
-            { id: decoded.id, role: decoded.role },
-            process.env.JWT_SECRET,
-            { expiresIn: "30m" }
+        if (!stored || stored.revoked_at || new Date(stored.expires_at) < new Date() || stored.user_id !== decoded.id) {
+            return fail(res, 403, 'Refresh token inválido');
+        }
+        const [[user]] = await pool.query(
+            `SELECT id, role, status, deleted_at FROM users WHERE id = ?`,
+            [decoded.id]
         );
-
-        res.json({ accessToken: newAccessToken });
-
+        if (!user || user.status !== 'active' || user.deleted_at) {
+            return fail(res, 403, 'Refresh token inválido');
+        }
+        await pool.query(`UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ?`, [stored.id]);
+        const accessToken = accessTokenFor(user);
+        const nextRefresh = await storeRefreshToken(user);
+        res.json({ accessToken, refreshToken: nextRefresh });
     } catch (error) {
-        return res.status(403).json({ message: "Refresh token inválido" });
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return fail(res, 403, 'Refresh token inválido');
+        }
+        logger.error('refresh', { message: error.message });
+        res.status(500).json({ message: 'Error interno del servidor' });
+    }
+};
+
+export const logout = async (req, res) => {
+    const token = req.body?.refreshToken;
+    try {
+        if (token) {
+            await pool.query(
+                `UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ? AND revoked_at IS NULL`,
+                [hashToken(token)]
+            );
+        }
+        res.json({ message: 'Sesión cerrada' });
+    } catch (error) {
+        logger.error('logout', { message: error.message });
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };

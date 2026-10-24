@@ -26,11 +26,36 @@ CREATE TABLE IF NOT EXISTS users (
   timezone       VARCHAR(50)  DEFAULT 'Europe/Madrid',
 
   last_login     DATETIME,
+  deleted_at     DATETIME DEFAULT NULL,
+  anonymized_at  DATETIME DEFAULT NULL,
   plan           ENUM('free','pro','business') DEFAULT 'free',
   trial_ends_at  DATETIME,
 
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NOT NULL,
+  token_hash  CHAR(64) NOT NULL,
+  expires_at  DATETIME NOT NULL,
+  revoked_at  DATETIME NULL,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_refresh_hash (token_hash),
+  INDEX idx_refresh_user (user_id),
+  CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS waitlist_signups (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(120) NOT NULL,
+  email       VARCHAR(150) NOT NULL,
+  profession  VARCHAR(120) NULL,
+  city        VARCHAR(80) NULL,
+  consent     TINYINT(1) NOT NULL DEFAULT 0,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_waitlist_email (email)
 );
 
 -- ══════════════════════════════════════════════════════════

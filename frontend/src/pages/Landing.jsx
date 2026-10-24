@@ -56,6 +56,14 @@ const FEATURES = [
   },
 ];
 
+// Precios de lanzamiento. Cámbialos aquí cuando cierres la tarifa.
+const PRICING = {
+  standardLabel: '12–15 €/mes',
+  founderLabel: '9 €/mes',
+  founderSpots: 50,
+  note: 'Cifras orientativas, todavía no son el precio definitivo.',
+};
+
 // Planes extraídos de backend/src/config/plans.js
 const PLANS = [
   {
@@ -152,8 +160,10 @@ export default function Landing() {
   const [billing, setBilling]   = useState('monthly');
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [form, setForm]         = useState({ name: '', email: '', message: '' });
+  const [form, setForm]         = useState({ name: '', email: '', profession: '', city: 'Málaga', consent: false });
   const [sent, setSent]         = useState(false);
+  const [waitError, setWaitError] = useState('');
+  const [waitLoading, setWaitLoading] = useState(false);
   const [ticker, setTicker]     = useState(false);
 
   const [heroRef,  heroV]  = useInView(0.2);
@@ -176,6 +186,30 @@ export default function Landing() {
   const scrollTo = id => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setMenuOpen(false);
+  };
+
+  const submitWaitlist = async e => {
+    e.preventDefault();
+    setWaitError('');
+    if (!form.consent) {
+      setWaitError('Marca la casilla para que podamos guardar tu email.');
+      return;
+    }
+    setWaitLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/waitlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, consent: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'No se ha podido apuntar');
+      setSent(true);
+    } catch (err) {
+      setWaitError(err.message);
+    } finally {
+      setWaitLoading(false);
+    }
   };
 
   const NAV = [
@@ -379,28 +413,28 @@ export default function Landing() {
           {/* Pill */}
           <div className={`fade-up${heroV?' in':''}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(58,91,217,.07)', border:'1px solid rgba(58,91,217,.18)', borderRadius:99, padding:'6px 16px', fontSize:12.5, color:'var(--blue)', fontWeight:600, marginBottom:28, letterSpacing:'.01em' }}>
             <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--teal)', flexShrink:0, animation:'shimmer 2s ease infinite' }} />
-            Gestión integral para freelancers y autónomos
+            Para autónomos de oficios y servicios en Málaga
           </div>
 
           {/* H1 */}
           <h1 className={`fade-up d1${heroV?' in':''}`} style={{ fontSize:'clamp(36px,5.5vw,72px)', fontWeight:800, lineHeight:1.06, letterSpacing:'-.03em', color:'var(--dark)', marginBottom:22 }}>
-            Centraliza tu negocio.<br />
+            Presupuesto en el móvil.<br />
             <span style={{ fontFamily:"'Instrument Serif', serif", fontStyle:'italic', fontWeight:400, color:'var(--blue)' }}>
-              Factúra sin fricciones.
+              Factura en un clic. Cumple VeriFactu.
             </span>
           </h1>
 
           <p className={`fade-up d2${heroV?' in':''}`} style={{ fontSize:'clamp(16px,2vw,18.5px)', color:'var(--muted)', maxWidth:560, margin:'0 auto 40px', lineHeight:1.72 }}>
-            Clientes, proyectos, facturas PDF, gastos, horas y contabilidad en una sola herramienta. Sin hojas de cálculo, sin herramientas dispersas.
+            Hecho para fontaneros, electricistas, reformas y servicios en Málaga. Haces el presupuesto en el teléfono, lo pasas a factura y Workly prepara el registro VeriFactu.
           </p>
 
           <div className={`hero-cta fade-up d3${heroV?' in':''}`} style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginBottom:52 }}>
-            <Link to="/register" className="btn-p" style={{ fontSize:15.5, padding:'14px 30px' }}>
-              Empieza gratis — plan Free disponible →
-            </Link>
-            <button className="btn-s" onClick={() => scrollTo('funciones')}>
-              Ver todas las funciones
+            <button className="btn-p" style={{ fontSize:15.5, padding:'14px 30px' }} onClick={() => scrollTo('contacto')}>
+              Apuntarme a la lista de Málaga
             </button>
+            <Link to="/register" className="btn-s">
+              Crear cuenta
+            </Link>
           </div>
 
           {/* Stack pill */}
@@ -494,7 +528,9 @@ export default function Landing() {
               Transparencia total.<br />
               <span style={{ fontFamily:"'Instrument Serif',serif", fontStyle:'italic', fontWeight:400, color:'var(--orange)' }}>Sin letra pequeña.</span>
             </h2>
-            <p style={{ fontSize:16, color:'var(--muted)', lineHeight:1.6 }}>Cancela cuando quieras. Plan Free para siempre disponible.</p>
+            <p style={{ fontSize:16, color:'var(--muted)', lineHeight:1.6 }}>
+              Precio previsto: {PRICING.standardLabel}. Precio fundador: {PRICING.founderLabel} para los primeros {PRICING.founderSpots}. {PRICING.note}
+            </p>
 
             {/* Toggle */}
             <div style={{ display:'inline-flex', background:'#fff', border:'1px solid var(--border)', borderRadius:99, padding:4, marginTop:24, gap:2 }}>
@@ -625,45 +661,43 @@ export default function Landing() {
       {/* ══ CONTACTO ═════════════════════════════════ */}
       <section id="contacto" style={{ padding:'clamp(64px,8vw,100px) clamp(20px,6%,80px)', background:'var(--bg)', borderTop:'1px solid var(--border)' }} className="sp">
         <div style={{ maxWidth:520, margin:'0 auto' }}>
-          <p style={{ fontSize:12.5, fontWeight:700, color:'var(--blue)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12, textAlign:'center' }}>Contacto</p>
+          <p style={{ fontSize:12.5, fontWeight:700, color:'var(--blue)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:12, textAlign:'center' }}>Lista de espera</p>
           <h2 style={{ fontSize:'clamp(24px,4vw,40px)', fontWeight:800, lineHeight:1.12, letterSpacing:'-.03em', marginBottom:10, textAlign:'center' }}>
-            ¿Tienes alguna duda?
+            Plazas para autónomos de Málaga
           </h2>
           <p style={{ fontSize:16, color:'var(--muted)', marginBottom:36, lineHeight:1.7, textAlign:'center' }}>
-            Responderemos antes de 24 horas.
+            Déjanos tu oficio y la ciudad. Te escribimos cuando abramos el alta. Precio fundador: {PRICING.founderLabel}.
           </p>
 
           {sent ? (
             <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:14, padding:'48px 32px', textAlign:'center' }}>
               <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
-              <h3 style={{ fontSize:20, fontWeight:800, color:'var(--dark)', letterSpacing:'-.02em', marginBottom:10 }}>Mensaje enviado</h3>
-              <p style={{ color:'var(--muted)', fontSize:15, lineHeight:1.65 }}>Te responderemos en menos de 24 horas.</p>
-              <button onClick={() => setSent(false)} style={{ marginTop:20, background:'none', border:'none', color:'var(--blue)', fontFamily:'inherit', fontSize:14, fontWeight:600, cursor:'pointer' }}>
-                Enviar otro mensaje
-              </button>
+              <h3 style={{ fontSize:20, fontWeight:800, color:'var(--dark)', letterSpacing:'-.02em', marginBottom:10 }}>Estás en la lista</h3>
+              <p style={{ color:'var(--muted)', fontSize:15, lineHeight:1.65 }}>Te escribiremos cuando abramos plazas en Málaga.</p>
             </div>
           ) : (
-            <form onSubmit={e => { e.preventDefault(); setSent(true); setForm({ name:'', email:'', message:'' }); }}
+            <form onSubmit={submitWaitlist}
               style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:14, padding:'clamp(24px,4vw,36px)', display:'flex', flexDirection:'column', gap:14 }}>
               {[
                 { label:'Nombre', key:'name', type:'text', placeholder:'Tu nombre' },
                 { label:'Email',  key:'email', type:'email', placeholder:'tu@email.com' },
+                { label:'Oficio o sector', key:'profession', type:'text', placeholder:'Fontanería, electricidad, reformas…' },
+                { label:'Ciudad', key:'city', type:'text', placeholder:'Málaga' },
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ fontSize:13, fontWeight:600, color:'var(--mid)', display:'block', marginBottom:7 }}>{f.label}</label>
-                  <input type={f.type} required placeholder={f.placeholder} value={form[f.key]}
+                  <input type={f.type} required={f.key !== 'profession'} placeholder={f.placeholder} value={form[f.key]}
                     onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                     className="fi" />
                 </div>
               ))}
-              <div>
-                <label style={{ fontSize:13, fontWeight:600, color:'var(--mid)', display:'block', marginBottom:7 }}>Mensaje</label>
-                <textarea required placeholder="Cuéntanos en qué podemos ayudarte..." rows={4} value={form.message}
-                  onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
-                  className="fi" style={{ resize:'vertical' }} />
-              </div>
-              <button type="submit" className="btn-p" style={{ justifyContent:'center', padding:'13px', marginTop:4 }}>
-                Enviar mensaje
+              <label style={{ display:'flex', gap:10, alignItems:'flex-start', fontSize:13.5, color:'var(--mid)', lineHeight:1.5 }}>
+                <input type="checkbox" checked={form.consent} onChange={e => setForm(p => ({ ...p, consent: e.target.checked }))} style={{ marginTop:3 }} />
+                <span>Acepto que {`guardéis mi nombre y mi email para avisarme del alta. Puedo pedir que los borréis. He leído la `}<Link to="/privacidad">política de privacidad</Link>.</span>
+              </label>
+              {waitError && <p style={{ color:'#B91C1C', fontSize:13, margin:0 }}>{waitError}</p>}
+              <button type="submit" className="btn-p" disabled={waitLoading} style={{ justifyContent:'center', padding:'13px', marginTop:4 }}>
+                {waitLoading ? 'Apuntando…' : 'Quiero que me aviséis'}
               </button>
             </form>
           )}
@@ -705,8 +739,12 @@ export default function Landing() {
               {
                 title:'Legal',
                 items: [
-                  { label:'Política de privacidad', href:'/privacidad' },
-                  { label:'Estado del sistema',     href:'/estado' },
+                  { label:'Aviso legal', href:'/aviso-legal' },
+                  { label:'Privacidad', href:'/privacidad' },
+                  { label:'Cookies', href:'/cookies' },
+                  { label:'Términos', href:'/terminos' },
+                  { label:'Encargado del tratamiento', href:'/encargado' },
+                  { label:'Estado del sistema', href:'/estado' },
                 ],
               },
             ].map(col => (

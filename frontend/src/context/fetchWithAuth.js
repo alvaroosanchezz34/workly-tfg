@@ -38,6 +38,7 @@ const doRefresh = async () => {
 
             const data = await res.json();
             localStorage.setItem('token', data.accessToken);
+            if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
             localStorage.setItem('loginTime', Date.now());
             onTokenRefreshed?.(data.accessToken);
             return data.accessToken;

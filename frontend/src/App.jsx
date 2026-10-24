@@ -26,7 +26,8 @@ const DeclaracionResponsable = lazy(() => import('./pages/DeclaracionResponsable
 const PublicInvoice    = lazy(() => import('./pages/PublicInvoice'));
 const Team             = lazy(() => import('./pages/Team'));
 const CompanySetup     = lazy(() => import('./pages/CompanySetup'));
-const Privacidad       = lazy(() => import('./pages/Privacidad'));
+const LegalDraft       = lazy(() => import('./pages/LegalDraft'));
+const WaitlistAdmin    = lazy(() => import('./pages/WaitlistAdmin'));
 const Estado           = lazy(() => import('./pages/Estado'));
 const Billing          = lazy(() => import('./pages/Billing'));
 const BillingSuccess   = lazy(() => import('./pages/BillingSuccess'));
@@ -100,7 +101,7 @@ const OnboardingWrapper = () => {
     const { token, isAuthenticated } = useContext(AuthContext);
     const location = useLocation();
     const [show, setShow] = useState(false);
-    const PUBLIC = ['/', '/login', '/register', '/privacidad', '/estado', '/billing', '/billing/success'];
+    const PUBLIC = ['/', '/login', '/register', '/privacidad', '/aviso-legal', '/cookies', '/terminos', '/encargado', '/estado', '/billing', '/billing/success'];
     const isPublic = PUBLIC.includes(location.pathname) || location.pathname.startsWith('/p/');
 
     useEffect(() => {
@@ -125,7 +126,11 @@ const AppInner = () => (
                 <Route path="/"                element={<Landing />} />
                 <Route path="/login"           element={<Login />} />
                 <Route path="/register"        element={<Register />} />
-                <Route path="/privacidad"      element={<Privacidad />} />
+                <Route path="/privacidad"      element={<LegalDraft docId="privacidad" />} />
+                <Route path="/aviso-legal"     element={<LegalDraft docId="aviso-legal" />} />
+                <Route path="/cookies"         element={<LegalDraft docId="cookies" />} />
+                <Route path="/terminos"        element={<LegalDraft docId="terminos" />} />
+                <Route path="/encargado"       element={<LegalDraft docId="encargado" />} />
                 <Route path="/estado"          element={<Estado />} />
                 <Route path="/p/:token"        element={<PublicInvoice />} />
 
@@ -143,6 +148,7 @@ const AppInner = () => (
                 <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
                 <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
+                <Route path="/waitlist"        element={<PrivateRoute><WaitlistAdmin /></PrivateRoute>} />
                 <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />
                 <Route path="/company/setup"   element={<PrivateRoute><CompanySetup /></PrivateRoute>} />
                 <Route path="/billing"         element={<PrivateRoute><Billing /></PrivateRoute>} />
@@ -157,7 +163,7 @@ const AppInner = () => (
         <NotifPanel />
         <GlobalSearchWrapper />
         <OnboardingWrapper />
-        <CookieBanner />
+        {import.meta.env.VITE_OPTIONAL_COOKIES === '1' && <CookieBanner />}
     </UIProvider>
 );
 

@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, FolderOpen, FileText, ShieldCheck,
     CreditCard, Wrench, Activity, Trash2, Crown, BookOpen,
     ChevronUp, LogOut, UserCircle, Bell, Search, Moon, Sun, Timer,
-    CalendarDays, Menu, X, Building2,
+    CalendarDays, Menu, X, Building2, ListChecks,
 } from 'lucide-react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useContext, useState, useRef, useEffect } from 'react';
@@ -119,6 +119,7 @@ export default function Sidebar() {
                             <span className="sidebar-section-label">Admin</span>
                             <Item to="/activity"        icon={<Activity size={16}/>} label="Actividad"           badge="Admin" />
                             <Item to="/clients/deleted" icon={<Trash2 size={16}/>}   label="Clientes eliminados" badge="Admin" />
+                            <Item to="/waitlist"        icon={<ListChecks size={16}/>} label="Lista de espera"    badge="Admin" />
                         </>
                     )}
 

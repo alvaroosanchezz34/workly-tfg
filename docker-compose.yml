@@ -1,0 +1,43 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-workly_root}
+      MYSQL_DATABASE: ${DB_NAME:-workly_db}
+      MYSQL_USER: ${DB_USER:-workly}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-workly_root}
+    volumes:
+      - workly_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-workly_root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: mysql
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  workly_mysql:

@@ -13,7 +13,7 @@ export const authenticate = async (req, res, next) => {
         // Leer plan y rol actuales desde la BD en cada petición
         // (el JWT puede estar desactualizado si el plan cambió después del login)
         const [[user]] = await pool.query(
-            `SELECT id, name, email, role, plan, plan_status, company_id FROM users WHERE id = ? AND status != 'suspended'`,
+            `SELECT id, name, email, role, plan, plan_status, company_id, status FROM users WHERE id = ? AND status = 'active' AND deleted_at IS NULL`,
             [decoded.id]
         );
 

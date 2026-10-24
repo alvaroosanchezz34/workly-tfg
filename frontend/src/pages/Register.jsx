@@ -18,7 +18,7 @@ export default function Register() {
     const handleSubmit = async e => {
         e.preventDefault();
         if (form.password !== form.confirm) return setError('Las contraseñas no coinciden');
-        if (form.password.length < 6)       return setError('La contraseña debe tener al menos 6 caracteres');
+        if (form.password.length < 8)       return setError('La contraseña debe tener al menos 8 caracteres');
         setError(''); setLoading(true);
         try {
             // Registro
@@ -83,7 +83,7 @@ export default function Register() {
                         <label className="login-label">Contraseña</label>
                         <div style={{ position: 'relative' }}>
                             <input className="login-input" type={showPw ? 'text' : 'password'} name="password" value={form.password} onChange={set}
-                                placeholder="Mínimo 6 caracteres" required style={{ paddingRight: 42 }} />
+                                placeholder="Mínimo 8 caracteres" required style={{ paddingRight: 42 }} />
                             <button type="button" onClick={() => setShowPw(v => !v)}
                                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', padding: 0 }}>
                                 {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
