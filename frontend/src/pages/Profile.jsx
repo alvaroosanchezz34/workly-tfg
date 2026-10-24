@@ -1,12 +1,13 @@
 import { useContext, useRef, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { updateProfile } from '../api/users';
+import { fetchWithAuth } from '../context/fetchWithAuth';
 import Sidebar from '../components/Sidebar';
 import { Input, Select, FormFooter } from '../components/FormComponents';
 import { CheckCircle, Camera } from 'lucide-react';
 
 const Profile = () => {
-    const { token, user, login } = useContext(AuthContext);
+    const { token, user, login, logout } = useContext(AuthContext);
     const avatarInputRef = useRef(null);
 
     const [form, setForm] = useState({
@@ -24,6 +25,9 @@ const Profile = () => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error,   setError]   = useState('');
+    const [confirmDelete, setConfirmDelete] = useState('');
+    const [accountMsg, setAccountMsg] = useState('');
+    const [accountBusy, setAccountBusy] = useState(false);
 
     const set = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -56,6 +60,41 @@ const Profile = () => {
     };
 
     const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U';
+
+    const downloadExport = async () => {
+        setAccountMsg('');
+        const res = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/account/export`, token);
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setAccountMsg(data.message || 'No se ha podido exportar');
+            return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'mis-datos-workly.json';
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const closeAccount = async () => {
+        setAccountBusy(true);
+        setAccountMsg('');
+        try {
+            const res = await fetchWithAuth(`${import.meta.env.VITE_API_URL}/account/delete`, token, {
+                method: 'POST',
+                body: JSON.stringify({ confirm: confirmDelete }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'No se ha podido cerrar la cuenta');
+            logout();
+        } catch (err) {
+            setAccountMsg(err.message);
+        } finally {
+            setAccountBusy(false);
+        }
+    };
 
     return (
         <div className="app-layout">
@@ -201,7 +240,7 @@ const Profile = () => {
                                 label="Nueva contraseña (dejar vacío para no cambiar)"
                                 name="password" type="password"
                                 value={form.password} onChange={set}
-                                placeholder="Mínimo 6 caracteres"
+                                placeholder="Mínimo 8 caracteres"
                             />
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 20, marginTop: 8, borderTop: '1px solid var(--border)' }}>
@@ -210,6 +249,24 @@ const Profile = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+
+                    <div className="card card-p" style={{ marginTop: 16 }}>
+                        <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Tus datos y el cierre de la cuenta</h3>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 14 }}>
+                            Puedes descargar una copia en JSON. Si cierras la cuenta, se anonimiza el acceso y los datos de contacto,
+                            se retiran los borradores y se borra el certificado electrónico guardado. Las facturas ya emitidas y los
+                            registros VeriFactu se conservan al menos 4 años: es una obligación fiscal, no se pueden borrar desde aquí.
+                        </p>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                            <button type="button" className="btn btn-ghost" onClick={downloadExport}>Descargar mis datos</button>
+                        </div>
+                        <label className="form-label">Escribe ELIMINAR para cerrar la cuenta</label>
+                        <input className="form-input" value={confirmDelete} onChange={e => setConfirmDelete(e.target.value)} placeholder="ELIMINAR" />
+                        {accountMsg && <p style={{ fontSize: 13, marginTop: 10 }}>{accountMsg}</p>}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                            <button type="button" className="btn btn-danger" onClick={closeAccount} disabled={accountBusy}>Cerrar cuenta</button>
+                        </div>
                     </div>
                 </div>
             </main>

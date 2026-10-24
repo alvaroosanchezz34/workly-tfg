@@ -13,6 +13,15 @@ export const AuthProvider = ({ children }) => {
     const isRefreshing = useRef(false);
 
     const logout = useCallback(() => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+            fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken }),
+                keepalive: true,
+            }).catch(() => {});
+        }
         setToken(null); setUser(null); setCompany(null); setCompanyRole(null);
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -38,6 +47,7 @@ export const AuthProvider = ({ children }) => {
             const data = await res.json();
             setToken(data.accessToken);
             localStorage.setItem('token', data.accessToken);
+            if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
             localStorage.setItem('loginTime', Date.now());
             setSessionWarning(null);
             return data.accessToken;

@@ -42,8 +42,8 @@ export const updateProfile = async (req, res) => {
         ];
 
         if (password) {
-            if (password.length < 6)
-                return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+            if (password.length < 8)
+                return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
 
             // FIX: verificar contraseña actual antes de permitir el cambio
             if (!current_password)

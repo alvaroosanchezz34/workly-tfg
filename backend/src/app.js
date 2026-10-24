@@ -28,11 +28,32 @@ import timeTrackingRoutes from './routes/timeTracking.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import recurringExpensesRoutes from './routes/recurringExpenses.routes.js';
 import verifactuRoutes from './routes/verifactu.routes.js';
+import accountRoutes from './routes/account.routes.js';
+import waitlistRoutes from './routes/waitlist.routes.js';
+import { pool } from './config/db.js';
+import { logger, reportError } from './utils/logger.js';
+import { publicErrorMessage } from './utils/publicError.js';
 
 const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+app.use((req, res, next) => {
+    const send = res.json.bind(res);
+    res.json = (body) => {
+        if (res.statusCode >= 500 && body && typeof body === 'object' && typeof body.message === 'string') {
+            return send({ ...body, message: publicErrorMessage({ message: body.message }, res.statusCode) });
+        }
+        return send(body);
+    };
+    next();
+});
 app.use(cors({
     origin: (origin, callback) => {
         const allowed = [process.env.FRONTEND_URL, 'https://workly.space', 'https://www.workly.space', 'http://localhost:5173'].filter(Boolean);
@@ -64,6 +85,8 @@ app.post('/api/billing/portal', authenticate, createPortal);
 
 // Resto de rutas
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/clients', clientsRoutes);
@@ -86,11 +109,20 @@ app.use('/api/time', timeTrackingRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/recurring-expenses', recurringExpensesRoutes);
 
-app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date() }));
+app.get('/api/health', async (_req, res) => {
+    try {
+        await pool.query('SELECT 1 AS ok');
+        res.json({ status: 'ok', db: 'up', timestamp: new Date().toISOString() });
+    } catch (err) {
+        logger.error('health', { message: err.message });
+        res.status(503).json({ status: 'degraded', db: 'down', timestamp: new Date().toISOString() });
+    }
+});
 
-app.use((err, _req, res, _next) => {
-    console.error('[Error]', err.message);
-    res.status(err.status || 500).json({ message: err.message || 'Error interno del servidor' });
+app.use((err, req, res, _next) => {
+    reportError(err, { path: req.path });
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({ message: publicErrorMessage(err, status) });
 });
 
 export default app;

@@ -72,7 +72,7 @@ describe('Auth - POST /api/auth/register', () => {
       password: '123',
     });
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/6 caracteres/i);
+    expect(res.body.message).toMatch(/8 caracteres/i);
   });
 
   test('400 - email con formato inválido', async () => {

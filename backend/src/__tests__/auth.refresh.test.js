@@ -28,12 +28,21 @@ describe('Auth - POST /api/auth/refresh', () => {
     process.env.JWT_REFRESH_SECRET = secret;
     process.env.JWT_SECRET = 'access_secret';
 
+    mockQuery
+      .mockResolvedValueOnce([[{
+        id: 3, user_id: 1, revoked_at: null, expires_at: new Date(Date.now() + 86_400_000),
+      }]])
+      .mockResolvedValueOnce([[{ id: 1, role: 'user', status: 'active', deleted_at: null }]])
+      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([{ insertId: 4 }]);
+
     const res = await request(app).post('/api/auth/refresh').send({
       refreshToken: validToken,
     });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('accessToken');
+    expect(res.body).toHaveProperty('refreshToken');
     expect(typeof res.body.accessToken).toBe('string');
   });
 
