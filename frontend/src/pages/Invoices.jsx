@@ -7,6 +7,7 @@ import InvoiceForm from '../components/InvoiceForm';
 import InvoiceFilters from '../components/invoice/InvoiceFilters';
 import Pagination from '../components/Pagination';
 import useIsMobile from '../hooks/useIsMobile';
+import { useFeedback } from '../context/FeedbackContext';
 
 // Cargados bajo demanda: solo se montan al abrir su pestaña/modal, y
 // InvoiceStatsPanel arrastra recharts, el mayor peso de esta página.
@@ -192,6 +193,7 @@ function InvoicePreview({ invoice }) {
 // ── Página principal ───────────────────────────────────────────
 export default function Invoices() {
     const { token } = useContext(AuthContext);
+    const { toast, ask } = useFeedback();
     const isMobile  = useIsMobile();
 
     const [invoices,   setInvoices]   = useState([]);
@@ -255,11 +257,11 @@ export default function Invoices() {
 
     const loadStats = async () => {
         try { const s = await getInvoiceStats(token); setStats(s); setShowStats(true); }
-        catch { alert('Error al cargar estadísticas'); }
+        catch { toast('No se han podido cargar las estadísticas', 'error'); }
     };
 
     const handleEdit   = async inv => {
-        if (inv.status && inv.status !== 'draft') return alert('Una factura emitida no se edita. Puedes anularla o crear una rectificativa.');
+        if (inv.status && inv.status !== 'draft') return toast('Una factura emitida no se edita. Puedes anularla o crear una rectificativa.', 'error');
         const full = await getInvoiceById(token, inv.id);
         setEditing(full); setShowForm(true);
     };
@@ -268,21 +270,22 @@ export default function Invoices() {
             if (data.id) await updateInvoice(token, data.id, data);
             else await createInvoice(token, data);
             setShowForm(false); setEditing(null); load();
-        } catch (err) { alert(err.message); }
+        } catch (err) { toast(err.message, 'error'); }
     };
     const handleDelete = async () => {
         const res = await deleteInvoice(token, toDelete.id);
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            alert(data.message || 'No se pudo eliminar');
+            toast(data.message || 'No se ha podido eliminar', 'error');
             return;
         }
         setToDelete(null); load();
+        toast('Borrador eliminado', 'success');
     };
     const closeForm    = () => { setShowForm(false); setEditing(null); };
     const handleStatusChange = async (id, status) => {
         try { await updateInvoiceStatus(token, id, status); load(); }
-        catch (err) { alert(err.message); }
+        catch (err) { toast(err.message, 'error'); }
     };
     const openFiscal = (type, invoice) => {
         setVoidReason('');
@@ -294,47 +297,59 @@ export default function Invoices() {
         if (!fiscal) return;
         setFiscalBusy(true);
         try {
-            if (fiscal.type === 'issue') await issueInvoice(token, fiscal.invoice.id);
-            else if (fiscal.type === 'void') await voidInvoice(token, fiscal.invoice.id, voidReason.trim());
-            else await rectifyInvoice(token, fiscal.invoice.id, rectifyMethod, rectifyCode);
+            if (fiscal.type === 'issue') {
+                if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    toast('Sin conexión no se puede emitir: el número y la huella VeriFactu tienen que salir en orden.', 'error');
+                    return;
+                }
+                await issueInvoice(token, fiscal.invoice.id);
+                toast('Factura emitida. El número oficial ya está asignado.', 'success');
+            } else if (fiscal.type === 'void') {
+                await voidInvoice(token, fiscal.invoice.id, voidReason.trim());
+                toast('Factura anulada. El número no se reutiliza.', 'success');
+            } else {
+                await rectifyInvoice(token, fiscal.invoice.id, rectifyMethod, rectifyCode);
+                toast('Borrador de rectificativa creado. Emítelo cuando esté listo.', 'success');
+            }
             setFiscal(null);
             load();
-        } catch (err) { alert(err.message); }
+        } catch (err) { toast(err.message, 'error'); }
         finally { setFiscalBusy(false); }
     };
 
     const toggleSelect = id => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
     const toggleSelectAll = () => setSelectedIds(ids => ids.length === invoices.length ? [] : invoices.map(i => i.id));
     const handleBulkDelete = async () => {
-        if (!confirm(`¿Eliminar ${selectedIds.length} factura(s)? Solo se borran los borradores. Las emitidas se omiten.`)) return;
+        const ok = await ask({ title: 'Eliminar borradores', body: `Se revisarán ${selectedIds.length} facturas. Solo se borran los borradores. Las emitidas se quedan.`, confirmLabel: 'Eliminar borradores', danger: true });
+        if (!ok) return;
         setBulkBusy(true);
-        try { const res = await bulkDeleteInvoices(token, selectedIds); alert(res.message); load(); }
+        try { const res = await bulkDeleteInvoices(token, selectedIds); toast(res.message, 'success'); load(); }
         finally { setBulkBusy(false); }
     };
     const handleBulkStatus = async status => {
         setBulkBusy(true);
-        try { const res = await bulkUpdateInvoiceStatus(token, selectedIds, status); alert(res.message); load(); }
+        try { const res = await bulkUpdateInvoiceStatus(token, selectedIds, status); toast(res.message, 'success'); load(); }
         finally { setBulkBusy(false); }
     };
     const handleDownload = async inv => {
         setDownloading(inv.id);
         try { await downloadInvoicePDF(token, inv.id); }
-        catch { alert('Error al generar el PDF'); }
+        catch { toast('No se ha podido generar el PDF', 'error'); }
         finally { setDownloading(null); }
     };
     const handlePreview = async inv => {
         try { setPreviewInv(await getInvoiceById(token, inv.id)); }
-        catch { alert('Error al cargar factura'); }
+        catch { toast('No se ha podido cargar la factura', 'error'); }
     };
     const openSendModal = async inv => {
         try { const full = await getInvoiceById(token, inv.id); setSendEmail(full.client_email||''); setSendOk(''); setShowSend(full); }
         catch { setSendEmail(''); setSendOk(''); setShowSend(inv); }
     };
     const handleSendEmail = async () => {
-        if (!sendEmail.trim()) return alert('Introduce un email destinatario');
+        if (!sendEmail.trim()) return toast('Escribe el email de destino', 'error');
         setSending(true);
         try { const data = await sendInvoiceByEmail(token, showSend.id, sendEmail.trim()); setSendOk(data.message); load(); }
-        catch (err) { alert(err.message); }
+        catch (err) { toast(err.message, 'error'); }
         finally { setSending(false); }
     };
 
