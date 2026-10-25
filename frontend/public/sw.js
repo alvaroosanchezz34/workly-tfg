@@ -1,5 +1,5 @@
 // public/sw.js — Workly Service Worker
-const CACHE_NAME    = 'workly-v1';
+const CACHE_NAME    = 'workly-v2';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -28,6 +28,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const { request } = event;
     const url = new URL(request.url);
+
+    // Nunca se guarda un POST. Emitir factura exige red y el orden VeriFactu.
+    if (request.method !== 'GET') return;
 
     // API calls — siempre red, nunca cachear
     if (url.pathname.startsWith('/api/')) {

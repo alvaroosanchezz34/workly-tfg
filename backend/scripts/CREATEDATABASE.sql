@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS users (
   deleted_at     DATETIME DEFAULT NULL,
   anonymized_at  DATETIME DEFAULT NULL,
   plan           ENUM('free','pro','business') DEFAULT 'free',
+  plan_status    VARCHAR(20) DEFAULT 'active',
+  plan_expires_at DATETIME NULL,
+  stripe_customer_id VARCHAR(80) NULL,
+  stripe_subscription_id VARCHAR(80) NULL,
   trial_ends_at  DATETIME,
 
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -160,6 +164,7 @@ CREATE TABLE IF NOT EXISTS services (
   name          VARCHAR(150) NOT NULL,
   default_rate  DECIMAL(10,2),
   unit          VARCHAR(50),
+  trade         VARCHAR(40) NULL,
 
   is_deleted    TINYINT(1) DEFAULT 0,
   deleted_at    DATETIME DEFAULT NULL,
@@ -185,6 +190,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   amount       DECIMAL(10,2) NOT NULL,
   date         DATE NOT NULL,
   receipt_url  VARCHAR(255),
+  receipt_image MEDIUMTEXT NULL,
 
   is_deleted   TINYINT(1) DEFAULT 0,
   deleted_at   DATETIME DEFAULT NULL,
@@ -517,6 +523,10 @@ CREATE TABLE IF NOT EXISTS quotes (
 
   converted_to_invoice_id BIGINT DEFAULT NULL,
   notes                   TEXT,
+  public_token            CHAR(64) NULL,
+  signature_name          VARCHAR(120) NULL,
+  signature_data          MEDIUMTEXT NULL,
+  accepted_at             DATETIME NULL,
 
   is_deleted              TINYINT(1) DEFAULT 0,
   deleted_at              DATETIME DEFAULT NULL,
@@ -530,7 +540,18 @@ CREATE TABLE IF NOT EXISTS quotes (
   CONSTRAINT fk_quotes_project
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_quotes_company
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
+  UNIQUE KEY uq_quote_public (public_token)
+);
+
+CREATE TABLE IF NOT EXISTS quote_photos (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  quote_id   BIGINT NOT NULL,
+  user_id    INT NOT NULL,
+  caption    VARCHAR(120) NULL,
+  image      MEDIUMTEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_quote_photos_quote FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE
 );
 
 -- ══════════════════════════════════════════════════════════
@@ -678,7 +699,7 @@ CREATE INDEX idx_billing_events_user ON billing_events(user_id);
 -- ══════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS tasks (
   id           INT AUTO_INCREMENT PRIMARY KEY,
-  project_id   INT NOT NULL,
+  project_id   BIGINT NOT NULL,
   user_id      INT NOT NULL,
   assigned_to  INT DEFAULT NULL,
 
@@ -705,7 +726,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS time_entries (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   user_id      INT NOT NULL,
-  project_id   INT DEFAULT NULL,
+  project_id   BIGINT DEFAULT NULL,
 
   description  VARCHAR(255),
   started_at   DATETIME NOT NULL,

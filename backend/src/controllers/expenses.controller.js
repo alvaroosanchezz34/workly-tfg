@@ -17,14 +17,18 @@ const normalizeDate = raw => {
 
 // Crear gasto
 export const createExpense = async (req, res) => {
-    const { category, description, amount, date, receipt_url } = req.body;
+    const { category, description, amount, date, receipt_url, receipt_image } = req.body;
+    const photo = receipt_image ? String(receipt_image) : null;
+    if (photo && (!/^data:image\/(png|jpeg);base64,/.test(photo) || photo.length > 180000)) {
+        return res.status(400).json({ message: 'La foto del ticket tiene que ser JPG o PNG y pesar poco' });
+    }
 
     try {
         const [result] = await pool.query(
             `INSERT INTO expenses
-       (user_id, company_id, category, description, amount, date, receipt_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, req.user.company_id || null, category, description, amount, date, receipt_url]
+       (user_id, company_id, category, description, amount, date, receipt_url, receipt_image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, category, description, amount, date, receipt_url, photo]
         );
 
         await logActivity({
@@ -61,7 +65,9 @@ export const getExpenses = async (req, res) => {
             `SELECT COUNT(*) AS total FROM expenses ${where}`, params
         );
         const [rows] = await pool.query(
-            `SELECT * FROM expenses ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
+            `SELECT id, user_id, company_id, category, description, amount, date, receipt_url,
+                    (receipt_image IS NOT NULL) AS has_receipt, created_at
+             FROM expenses ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         );
 

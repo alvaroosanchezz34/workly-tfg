@@ -12,6 +12,9 @@ import AISummaryWidget from '../components/ai/AISummaryWidget';
 import AIChat from '../components/ai/AIChat';
 import { TrendingUp, TrendingDown, DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { MotionDiv, staggerContainer, staggerItem } from '../utils/motion';
+import { fetchWithAuth } from '../context/fetchWithAuth';
+import { remindInvoice } from '../api/invoices';
+import { useFeedback } from '../context/FeedbackContext';
 
 const fmt = v => new Intl.NumberFormat('es-ES', { style:'currency', currency:'EUR' }).format(v ?? 0);
 
@@ -32,6 +35,48 @@ const SkeletonRow = () => (
         ))}
     </div>
 );
+
+function Aging({ token }) {
+    const { toast } = useFeedback();
+    const [rows, setRows] = useState(null);
+    useEffect(() => {
+        if (!token) return;
+        fetchWithAuth(`${import.meta.env.VITE_API_URL}/invoices/aging`, token)
+            .then(res => (res.ok ? res.json() : null))
+            .then(setRows)
+            .catch(() => {});
+    }, [token]);
+    if (!rows) return null;
+    const sum = list => (list || []).reduce((total, item) => total + Number(item.pending || 0), 0);
+    const owed = [...(rows.d61 || []), ...(rows.d31_60 || []), ...(rows.d1_30 || []), ...(rows.al_dia || [])].slice(0, 5);
+    const remind = async item => {
+        try {
+            const data = await remindInvoice(token, item.id);
+            toast(data.message || 'Recordatorio listo', 'success');
+            if (data.whatsapp && !data.emailed) {
+                window.open(`https://wa.me/?text=${encodeURIComponent(data.whatsapp)}`, '_blank', 'noopener,noreferrer');
+            }
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    return (
+        <section className="card card-p" style={{ marginBottom: 18 }} aria-label="Antigüedad de cobros">
+            <h2 style={{ fontSize: 15, marginBottom: 8 }}>Quién debe</h2>
+            <p style={{ fontSize: 14 }}>
+                Al día {fmt(sum(rows.al_dia))} · de 1 a 30 días {fmt(sum(rows.d1_30))} · de 31 a 60 {fmt(sum(rows.d31_60))} · más de 60 {fmt(sum(rows.d61))}
+            </p>
+            {owed.length > 0 && (
+                <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {owed.map(item => (
+                        <li key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                            <span>{item.client_name} · {fmt(item.pending)}</span>
+                            <button type="button" className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => remind(item)}>Recordar</button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
+    );
+}
 
 const Dashboard = () => {
     const { token, user } = useContext(AuthContext);
@@ -102,6 +147,7 @@ const Dashboard = () => {
                             <MotionDiv variants={staggerItem}><MetricCard title="Fact. pendientes"  value={data?.pendingInvoices ?? 0}  accentColor="#FF9800" icon={<Clock size={16}/>} /></MotionDiv>
                             <MotionDiv variants={staggerItem}><MetricCard title="Fact. vencidas"    value={data?.overdueInvoices ?? 0}  accentColor="#F44336" icon={<AlertCircle size={16}/>} /></MotionDiv>
                         </MotionDiv>
+                        <Aging token={token} />
 
                         {/* GRÁFICA + TOP CLIENTES — lado a lado desktop, apilado móvil */}
                         <div

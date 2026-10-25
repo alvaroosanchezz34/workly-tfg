@@ -28,6 +28,7 @@ const MONTHS_ES = [
 
 const EVENT_TYPES = {
     invoice:  { label: 'Factura',     color: '#1976D2', bg: 'rgba(25,118,210,0.12)',  icon: <FileText  size={10}/> },
+    job:      { label: 'Trabajo',     color: '#0F766E', bg: 'rgba(15,118,110,0.12)',  icon: <CalIcon   size={10}/> },
     quote:    { label: 'Presupuesto', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  icon: <FileText  size={10}/> },
     project:  { label: 'Proyecto',    color: '#10B981', bg: 'rgba(16,185,129,0.12)',  icon: <FolderOpen size={10}/> },
     task:     { label: 'Tarea',       color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)',  icon: <CheckSquare size={10}/> },
@@ -77,7 +78,7 @@ export default function CalendarPage() {
     const now = new Date();
     const [year,  setYear]  = useState(now.getFullYear());
     const [month, setMonth] = useState(now.getMonth());
-    const [filter, setFilter] = useState({ invoice: true, quote: true, project: true, task: true });
+    const [filter, setFilter] = useState({ invoice: true, quote: true, project: true, task: true, job: true });
     const [selected, setSelected] = useState(null); // key 'YYYY-MM-DD'
     const [events,   setEvents]   = useState([]);
     const [loading,  setLoading]  = useState(true);
@@ -113,11 +114,21 @@ export default function CalendarPage() {
             // Presupuestos → fecha expiración
             const quotes = Array.isArray(quo) ? quo : (quo?.data || quo?.quotes || []);
             quotes.forEach(q => {
+                const visit = toKey(q.issue_date);
+                if (visit) {
+                    evs.push({
+                        id: `job-${q.id}`, key: visit, type: 'job',
+                        label: q.client_name || q.quote_number,
+                        sub: q.quote_number,
+                        status: q.status,
+                        link: '/invoices',
+                    });
+                }
                 const key = toKey(q.expiry_date);
                 if (!key) return;
                 evs.push({
                     id: `quo-${q.id}`, key, type: 'quote',
-                    label: q.quote_number,
+                    label: q.client_name ? `${q.quote_number} · ${q.client_name}` : q.quote_number,
                     sub: fmt(q.total_amount),
                     status: q.status,
                     link: '/invoices',
@@ -185,7 +196,7 @@ export default function CalendarPage() {
                             <CalIcon size={20} style={{ color: 'var(--primary)' }} />
                             Calendario
                         </h1>
-                        <p className="page-subtitle">Vencimientos de facturas, presupuestos y proyectos</p>
+                        <p className="page-subtitle">Trabajos del día, vencimientos de facturas y presupuestos</p>
                     </div>
 
                     {/* Filtros */}

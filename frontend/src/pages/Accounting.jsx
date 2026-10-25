@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import { fetchWithAuth } from '../context/fetchWithAuth';
 import { BookOpen, TrendingUp, TrendingDown, Calculator, FileText } from 'lucide-react';
+import { toGestorCsv } from '../utils/gestorCsv';
 
 const API = import.meta.env.VITE_API_URL;
 const fmt = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
@@ -87,12 +88,21 @@ export default function Accounting() {
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Contabilidad</h1>
-                        <p className="page-subtitle">Libro de ingresos y gastos · Modelos fiscales</p>
+                        <p className="page-subtitle">Estimación para orientarte. No es la declaración. Revísala con tu gestoría.</p>
                     </div>
                     <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                         <select className="form-select" style={{ minWidth:90 }} value={year} onChange={e => setYear(e.target.value)}>
                             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
+                        <button type="button" className="btn btn-ghost" disabled={!data} onClick={() => {
+                            const blob = new Blob([toGestorCsv(data)], { type: 'text/csv;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `workly-${tab}-${year}-T${quarter}.csv`;
+                            link.click();
+                            URL.revokeObjectURL(url);
+                        }}>Descargar CSV para la gestoría</button>
                         {tab !== 'libro' && (
                             <select className="form-select" style={{ minWidth:140 }} value={quarter} onChange={e => setQuarter(e.target.value)}>
                                 {QUARTERS.map(q => <option key={q} value={q}>{Q_LABELS[q]}</option>)}

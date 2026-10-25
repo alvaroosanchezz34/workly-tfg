@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Circle, X, ChevronRight, Sparkles } from 'lucide-react';
 
 const STEPS = [
+    { id: 'fiscal',   label: 'Datos para facturar',     desc: 'Nombre, NIF y domicilio. Hace falta para VeriFactu.', path: '/empezar', emoji: '🧾' },
     { id: 'client',   label: 'Crea tu primer cliente',  desc: 'Añade un cliente para empezar a facturar.',       path: '/clients',  emoji: '👥' },
     { id: 'project',  label: 'Abre un proyecto',         desc: 'Asocia un proyecto a tu cliente.',                path: '/projects', emoji: '📁' },
     { id: 'invoice',  label: 'Genera una factura',       desc: 'Crea tu primera factura profesional en PDF.',     path: '/invoices', emoji: '🧾' },

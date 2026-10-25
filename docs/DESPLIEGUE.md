@@ -69,8 +69,10 @@ La primera vez, crea el esquema completo y marca las migraciones como ya aplicad
 docker compose up -d mysql
 # espera a que el healthcheck pase
 docker compose exec -T mysql mysql -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < backend/scripts/CREATEDATABASE.sql
-docker compose run --rm api node scripts/migrate.js --mark-applied 009
+docker compose run --rm api node scripts/migrate.js --mark-applied 010
 ```
+
+`CREATEDATABASE.sql` ya incluye las columnas de `010_oficio.sql` (enlace y firma del presupuesto, fotos, foto del ticket y oficio en el catálogo) y las de facturación del usuario (`plan_status`, `plan_expires_at`, `stripe_customer_id`, `stripe_subscription_id`). Sin esas cuatro, el login falla al leer el plan. Si la base se creó antes y ya tiene aplicada la `009`, no marques la `010`: deja que el runner la ejecute. Si a esa base le faltan las columnas de Stripe, añádelas a mano una vez.
 
 A partir de ahí, cada versión nueva:
 
@@ -78,7 +80,7 @@ A partir de ahí, cada versión nueva:
 docker compose run --rm api node scripts/migrate.js
 ```
 
-`--mark-applied 009` marca todos los ficheros cuyo número sea 009 o menor, sin ejecutarlos. Úsalo solo en una base que ya tiene esas tablas. En un servidor que ya estaba en marcha antes de esta versión y ya aplicó 002–008 a mano, marca hasta 008 y deja que el runner ejecute `009_production.sql`:
+`--mark-applied 010` marca todos los ficheros cuyo número sea 010 o menor, sin ejecutarlos. Úsalo solo en una base que ya tiene esas tablas. En un servidor que ya estaba en marcha antes de esta versión y ya aplicó 002–008 a mano, marca hasta 008 y deja que el runner ejecute `009_production.sql` y `010_oficio.sql`:
 
 ```bash
 docker compose run --rm api node scripts/migrate.js --mark-applied 008

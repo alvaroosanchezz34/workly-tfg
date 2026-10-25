@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import {
     createQuote, getQuotes, getQuoteById,
-    updateQuote, deleteQuote, convertQuoteToInvoice,
+    updateQuote, deleteQuote, convertQuoteToInvoice, signQuote, addQuotePhoto,
 } from '../controllers/quotes.controller.js';
 import { authenticate }     from '../middlewares/auth.middleware.js';
 import { requireFeature }   from '../middlewares/plan.middleware.js';
@@ -16,5 +16,7 @@ router.get('/:id',           authenticate, requireFeature('quotes'), getQuoteByI
 router.put('/:id',           authenticate, requireFeature('quotes'), updateQuote);
 router.delete('/:id',        authenticate, requireFeature('quotes'), deleteQuote);
 router.post('/:id/convert',  authenticate, requireFeature('quotes'), convertQuoteToInvoice);
+router.post('/:id/sign',     authenticate, requireFeature('quotes'), signQuote);
+router.post('/:id/photos',   authenticate, requireFeature('quotes'), addQuotePhoto);
 
 export default router;

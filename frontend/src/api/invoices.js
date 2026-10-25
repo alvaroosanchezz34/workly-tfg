@@ -41,6 +41,13 @@ export const voidInvoice = (token, id, reason) =>
 export const rectifyInvoice = (token, id, method, code) =>
     fetchWithAuth(`${BASE}/${id}/rectify`, token, { method: 'POST', body: JSON.stringify({ method, code }) }).then(parse);
 
+export const remindInvoice = async (token, id) => {
+    const res = await fetchWithAuth(`${BASE}/${id}/remind`, token, { method: 'POST', body: '{}' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok && res.status !== 429) throw new Error(data.message || 'No se pudo enviar el recordatorio');
+    return data;
+};
+
 export const getIssuerProfile = token =>
     fetchWithAuth(`${BASE}/issuer`, token).then(parse);
 

@@ -79,6 +79,14 @@ El panel parte los gráficos en otro fichero, bien. La primera carga sigue arras
 
 Emitir, anular, rectificar y pasar un presupuesto a factura ya no usan `alert`. El resultado sale en un aviso de la propia página, con `role="status"`, y se apaga solo. Borrar varios borradores pide confirmación dentro de la app. Si no hay red, emitir se bloquea: el número y la huella de VeriFactu no pueden salir desordenados.
 
+## Después de las funciones de oficio
+
+El presupuesto lleva partidas por oficio, un toque que crea un borrador de factura (el número sigue vacío hasta Emitir), WhatsApp, firma en pantalla y foto. El panel muestra quién debe. Contabilidad baja un CSV y avisa de que es una estimación. El calendario marca el día del presupuesto como trabajo. El asistente pide datos fiscales, serie y el primer cliente.
+
+Capturas de la web, ya con contraste y foco: `docs/ux/despues/landing-hero.webp`, `precios.webp`, `login.webp`, `landing-movil.webp`, `menu-movil.webp`.
+
+Con MariaDB en local y un usuario de prueba se recorrió el panel, el asistente, un presupuesto de fontanería pasado a borrador, el alta de gasto, contabilidad y el calendario: `docs/ux/despues/panel.png`, `empezar-1.png`, `empezar-2.png`, `facturas.png`, `presupuesto.png`, `presupuesto-movil.png`, `gasto.png`, `contabilidad.png`, `calendario.png`. La factura creada desde el presupuesto quedó en borrador, con `invoice_number` vacío.
+
 ## Lo que esta auditoría no tapa
 
 Los textos legales siguen en borrador. VeriFactu no se emite sin red. El precio de la web sigue siendo un marcador.
