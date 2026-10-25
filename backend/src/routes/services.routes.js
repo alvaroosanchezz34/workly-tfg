@@ -5,11 +5,14 @@ import {
   updateService,
   deleteService,
 } from '../controllers/services.controller.js';
+import { importTradeCatalog, listTradeCatalog } from '../controllers/oficio.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { checkLimit } from '../middlewares/plan.middleware.js';
 
 const router = express.Router();
 
+router.get('/catalog', authenticate, listTradeCatalog);
+router.post('/catalog', authenticate, importTradeCatalog);
 router.get('/', authenticate, getServices);
 router.post('/', authenticate, checkLimit('services'), createService);
 router.put('/:id', authenticate, updateService);

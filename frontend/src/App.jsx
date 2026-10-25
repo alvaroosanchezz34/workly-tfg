@@ -29,6 +29,8 @@ const Team             = lazy(() => import('./pages/Team'));
 const CompanySetup     = lazy(() => import('./pages/CompanySetup'));
 const LegalDraft       = lazy(() => import('./pages/LegalDraft'));
 const WaitlistAdmin    = lazy(() => import('./pages/WaitlistAdmin'));
+const PublicQuote      = lazy(() => import('./pages/PublicQuote'));
+const Empezar          = lazy(() => import('./pages/Empezar'));
 const Estado           = lazy(() => import('./pages/Estado'));
 const Billing          = lazy(() => import('./pages/Billing'));
 const BillingSuccess   = lazy(() => import('./pages/BillingSuccess'));
@@ -104,13 +106,13 @@ const OnboardingWrapper = () => {
     const location = useLocation();
     const [show, setShow] = useState(false);
     const PUBLIC = ['/', '/login', '/register', '/privacidad', '/aviso-legal', '/cookies', '/terminos', '/encargado', '/estado', '/billing', '/billing/success'];
-    const isPublic = PUBLIC.includes(location.pathname) || location.pathname.startsWith('/p/');
+    const isPublic = PUBLIC.includes(location.pathname) || location.pathname.startsWith('/p/') || location.pathname.startsWith('/q/');
 
     useEffect(() => {
         if (!token || !isAuthenticated || isPublic) return;
         const dismissed = localStorage.getItem('workly_onboarding_dismissed');
         const done = JSON.parse(localStorage.getItem('workly_onboarding') || '[]');
-        if (!dismissed && done.length < 5) {
+        if (!dismissed && done.length < 6) {
             const t = setTimeout(() => setShow(true), 1200);
             return () => clearTimeout(t);
         }
@@ -136,6 +138,7 @@ const AppInner = () => (
                 <Route path="/encargado"       element={<LegalDraft docId="encargado" />} />
                 <Route path="/estado"          element={<Estado />} />
                 <Route path="/p/:token"        element={<PublicInvoice />} />
+                <Route path="/q/:token"        element={<PublicQuote />} />
 
                 <Route path="/dashboard"       element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                 <Route path="/clients"         element={<PrivateRoute><Clients /></PrivateRoute>} />
@@ -150,6 +153,7 @@ const AppInner = () => (
                 <Route path="/expenses"        element={<PrivateRoute><Expenses /></PrivateRoute>} />
                 <Route path="/services"        element={<PrivateRoute><Services /></PrivateRoute>} />
                 <Route path="/profile"         element={<PrivateRoute><Profile /></PrivateRoute>} />
+                <Route path="/empezar"         element={<PrivateRoute><Empezar /></PrivateRoute>} />
                 <Route path="/activity"        element={<PrivateRoute><ActivityLogs /></PrivateRoute>} />
                 <Route path="/waitlist"        element={<PrivateRoute><WaitlistAdmin /></PrivateRoute>} />
                 <Route path="/team"            element={<PrivateRoute><Team /></PrivateRoute>} />

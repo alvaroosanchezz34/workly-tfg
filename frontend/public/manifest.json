@@ -1,24 +1,15 @@
 {
-  "name": "Workly — Gestión Freelance",
+  "name": "Workly — presupuestos y facturas",
   "short_name": "Workly",
-  "description": "Plataforma de gestión para freelancers y equipos: clientes, proyectos, facturas y gastos.",
+  "description": "Presupuesto en el móvil y factura VeriFactu para autónomos de oficios.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#1976D2",
+  "background_color": "#EEF0F8",
+  "theme_color": "#3A5BD9",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/icons/icon-72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-128.png",  "sizes": "128x128", "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-144.png",  "sizes": "144x144", "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-152.png",  "sizes": "152x152", "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-192.png",  "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-384.png",  "sizes": "384x384", "type": "image/png", "purpose": "maskable any" },
-    { "src": "/icons/icon-512.png",  "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
-  ],
-  "screenshots": [
-    { "src": "/screenshots/dashboard.png", "sizes": "1280x800", "type": "image/png", "label": "Dashboard principal" }
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ],
   "categories": ["business", "finance", "productivity"],
   "lang": "es",

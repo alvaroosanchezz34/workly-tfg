@@ -47,11 +47,12 @@ export const createQuote = async (req, res) => {
         if (client.length === 0) throw new Error('Cliente no válido');
 
         const quoteNumber = await getNextQuoteNumber(conn, req.user.id);
+        const publicToken = crypto.randomBytes(32).toString('hex');
 
         const [result] = await conn.query(
-            `INSERT INTO quotes (user_id, company_id, client_id, project_id, quote_number, issue_date, expiry_date, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, req.user.company_id || null, client_id, project_id || null, quoteNumber, issue_date, expiry_date || null, notes]
+            `INSERT INTO quotes (user_id, company_id, client_id, project_id, quote_number, issue_date, expiry_date, notes, public_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.company_id || null, client_id, project_id || null, quoteNumber, issue_date, expiry_date || null, notes, publicToken]
         );
         const quoteId = result.insertId;
 
@@ -69,7 +70,7 @@ export const createQuote = async (req, res) => {
         await recalcQuoteTotals(conn, quoteId);
         await logActivity({ userId: req.user.id, entity: 'quote', entityId: quoteId, action: 'created' });
         await conn.commit();
-        res.status(201).json({ message: 'Presupuesto creado', quoteId, quote_number: quoteNumber });
+        res.status(201).json({ message: 'Presupuesto creado', quoteId, quote_number: quoteNumber, public_token: publicToken });
     } catch (err) {
         await conn.rollback();
         res.status(400).json({ message: err.message });
@@ -247,5 +248,54 @@ export const convertQuoteToInvoice = async (req, res) => {
         res.status(500).json({ message: err.message });
     } finally {
         conn.release();
+    }
+};
+
+const imageOk = (value, max) => {
+    const text = String(value || '');
+    return /^data:image\/(png|jpeg);base64,/.test(text) && text.length <= max;
+};
+
+export const signQuote = async (req, res) => {
+    const name = String(req.body?.signerName || '').trim();
+    const signature = String(req.body?.signature || '');
+    if (name.length < 2) return res.status(400).json({ message: 'Escribe el nombre de quien firma' });
+    if (!signature.startsWith('data:image/png;base64,') || signature.length > 80000) {
+        return res.status(400).json({ message: 'La firma tiene que ser un dibujo pequeño en PNG' });
+    }
+    try {
+        const scope = resourceScope(req, 'q');
+        const [result] = await pool.query(
+            `UPDATE quotes q SET signature_name = ?, signature_data = ?, accepted_at = NOW(), status = 'accepted'
+             WHERE q.id = ? AND ${scope.where} AND q.is_deleted = 0`,
+            [name, signature, req.params.id, ...scope.params]
+        );
+        if (!result.affectedRows) return res.status(404).json({ message: 'Presupuesto no encontrado' });
+        res.json({ message: 'Firma guardada' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error interno del servidor' });
+    }
+};
+
+export const addQuotePhoto = async (req, res) => {
+    const image = String(req.body?.image || '');
+    const caption = String(req.body?.caption || '').trim().slice(0, 120);
+    if (!imageOk(image, 180000)) return res.status(400).json({ message: 'La foto tiene que ser JPG o PNG y pesar poco' });
+    try {
+        const scope = resourceScope(req, 'q');
+        const [[quote]] = await pool.query(
+            `SELECT q.id FROM quotes q WHERE q.id = ? AND ${scope.where} AND q.is_deleted = 0`,
+            [req.params.id, ...scope.params]
+        );
+        if (!quote) return res.status(404).json({ message: 'Presupuesto no encontrado' });
+        const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM quote_photos WHERE quote_id = ?`, [quote.id]);
+        if (Number(total) >= 3) return res.status(400).json({ message: 'Máximo 3 fotos por presupuesto' });
+        await pool.query(
+            `INSERT INTO quote_photos (quote_id, user_id, caption, image) VALUES (?, ?, ?, ?)`,
+            [quote.id, req.user.id, caption || null, image]
+        );
+        res.status(201).json({ message: 'Foto guardada' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };

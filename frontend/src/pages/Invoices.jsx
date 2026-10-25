@@ -22,7 +22,7 @@ import {
     getInvoices, getInvoiceById, createInvoice, updateInvoice,
     deleteInvoice, downloadInvoicePDF, updateInvoiceStatus, getInvoiceStats,
     sendInvoiceByEmail, bulkDeleteInvoices, bulkUpdateInvoiceStatus,
-    issueInvoice, voidInvoice, rectifyInvoice,
+    issueInvoice, voidInvoice, rectifyInvoice, remindInvoice,
 } from '../api/invoices';
 import { getClients } from '../api/clients';
 import { getProjects } from '../api/projects';
@@ -316,6 +316,15 @@ export default function Invoices() {
         } catch (err) { toast(err.message, 'error'); }
         finally { setFiscalBusy(false); }
     };
+    const handleRemind = async invoice => {
+        try {
+            const data = await remindInvoice(token, invoice.id);
+            toast(data.message || 'Recordatorio listo', 'success');
+            if (data.whatsapp && !data.emailed) {
+                window.open(`https://wa.me/?text=${encodeURIComponent(data.whatsapp)}`, '_blank', 'noopener,noreferrer');
+            }
+        } catch (err) { toast(err.message, 'error'); }
+    };
 
     const toggleSelect = id => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
     const toggleSelectAll = () => setSelectedIds(ids => ids.length === invoices.length ? [] : invoices.map(i => i.id));
@@ -481,6 +490,7 @@ export default function Invoices() {
                                                 {inv.status === 'draft' && <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(inv)}>Editar</button>}
                                                 {inv.status === 'draft' && <button className="btn btn-danger btn-sm" onClick={() => setToDelete(inv)}>Eliminar</button>}
                                                 {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openSendModal(inv)}><Send size={12}/></button>}
+                                                {(inv.status === 'sent' || inv.status === 'overdue') && <button className="btn btn-ghost btn-sm" onClick={() => handleRemind(inv)}>Recordar</button>}
                                                 {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openFiscal('rectify', inv)}>Rectificar</button>}
                                                 {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn btn-ghost btn-sm" onClick={() => openFiscal('void', inv)}>Anular</button>}
                                             </div>
@@ -549,6 +559,7 @@ export default function Invoices() {
                                                         {inv.status === 'draft' && <button className="action-link action-link-primary" onClick={() => handleEdit(inv)}>Editar</button>}
                                                         {inv.status === 'draft' && <button className="action-link action-link-danger" style={{ marginLeft:4 }} onClick={() => setToDelete(inv)}>Eliminar</button>}
                                                         {inv.status !== 'draft' && inv.status !== 'void' && <button className="btn-icon" title="Enviar por email" style={{ display:'inline-flex', verticalAlign:'middle', marginLeft:4 }} onClick={() => openSendModal(inv)}><Send size={13}/></button>}
+                                                        {(inv.status === 'sent' || inv.status === 'overdue') && <button className="action-link" onClick={() => handleRemind(inv)}>Recordar</button>}
                                                         {inv.status !== 'draft' && inv.status !== 'void' && <button className="action-link" onClick={() => openFiscal('rectify', inv)}>Rectificar</button>}
                                                         {inv.status !== 'draft' && inv.status !== 'void' && <button className="action-link action-link-danger" onClick={() => openFiscal('void', inv)}>Anular</button>}
                                                     </td>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
 import InvoiceItems from '../InvoiceItems';
 import { Select, Textarea } from '../FormComponents';
@@ -7,6 +7,11 @@ import AISmartQuote from '../ai/AISmartQuote';
 import { Plus, FileText, ArrowRight, CheckCircle } from 'lucide-react';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useFeedback } from '../../context/FeedbackContext';
+import { fetchWithAuth } from '../../context/fetchWithAuth';
+import { TRADE_CATALOG, TRADE_LABEL } from '../../data/tradeCatalog';
+
+const API = import.meta.env.VITE_API_URL;
+const OFFLINE_KEY = 'workly_offline_quotes';
 
 const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -21,7 +26,89 @@ const STATUS = {
 
 const genId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-function QuoteForm({ clients, projects, services, initialData, onSubmit, onCancel }) {
+function compressPhoto(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('No se pudo leer la foto'));
+        reader.onload = () => {
+            const image = new Image();
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = Math.min(1, 800 / Math.max(image.width, image.height));
+                canvas.width = Math.max(1, Math.round(image.width * scale));
+                canvas.height = Math.max(1, Math.round(image.height * scale));
+                canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            image.onerror = () => reject(new Error('La foto no se puede abrir'));
+            image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function SignaturePad({ onChange }) {
+    const ref = useRef(null);
+    const drawing = useRef(false);
+    const point = event => {
+        const canvas = ref.current;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (event.clientX - rect.left) * (canvas.width / rect.width),
+            y: (event.clientY - rect.top) * (canvas.height / rect.height),
+        };
+    };
+    return (
+        <canvas
+            ref={ref}
+            width={640}
+            height={200}
+            aria-label="Zona de firma"
+            style={{ width: '100%', height: 160, border: '1px solid var(--border)', borderRadius: 12, background: '#fff', touchAction: 'none' }}
+            onPointerDown={event => {
+                drawing.current = true;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                const ctx = ref.current.getContext('2d');
+                const p = point(event);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+            }}
+            onPointerMove={event => {
+                if (!drawing.current) return;
+                const ctx = ref.current.getContext('2d');
+                const p = point(event);
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#1C2033';
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            }}
+            onPointerUp={() => {
+                drawing.current = false;
+                onChange(ref.current.toDataURL('image/png'));
+            }}
+        />
+    );
+}
+
+function lineFromCatalog(line) {
+    const quantity = 1;
+    const unitPrice = Number(line.default_rate);
+    const subtotal = quantity * unitPrice;
+    const taxAmount = Math.round(subtotal * 21) / 100;
+    return {
+        id: genId(),
+        description: line.name,
+        quantity,
+        unit_price: unitPrice,
+        tax_rate: 21,
+        subtotal,
+        tax_amount: taxAmount,
+        total: subtotal + taxAmount,
+    };
+}
+
+function QuoteForm({ clients, projects, services, initialData, onSubmit, onCancel, token }) {
     const narrow = useIsMobile(720);
     const { toast } = useFeedback();
     const fmt2d = d => (!d ? '' : d.split('T')[0]);
@@ -55,6 +142,26 @@ function QuoteForm({ clients, projects, services, initialData, onSubmit, onCance
 
             {/* Botón IA */}
             <AISmartQuote clients={clients} onApply={lines => setItems(lines)} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {Object.entries(TRADE_LABEL).map(([trade, label]) => (
+                    <button
+                        type="button"
+                        key={trade}
+                        className="btn btn-ghost"
+                        onClick={async () => {
+                            setItems(TRADE_CATALOG[trade].map(lineFromCatalog));
+                            if (navigator.onLine !== false && token) {
+                                await fetchWithAuth(`${API}/services/catalog`, token, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ trade }),
+                                }).catch(() => {});
+                            }
+                        }}
+                    >
+                        Partidas de {label}
+                    </button>
+                ))}
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
@@ -111,6 +218,9 @@ export default function QuotesTab({ token, clients, projects, services }) {
     const [editing,  setEditing]  = useState(null);
     const [toDelete, setToDelete] = useState(null);
     const [converting, setConverting] = useState(null);
+    const [signing, setSigning] = useState(null);
+    const [signerName, setSignerName] = useState('');
+    const [signature, setSignature] = useState('');
     const [convDates,  setConvDates]  = useState({ issue_date: new Date().toISOString().split('T')[0], due_date: '' });
 
     const load = useCallback(async () => {
@@ -121,9 +231,67 @@ export default function QuotesTab({ token, clients, projects, services }) {
     useEffect(() => { if (token) load(); }, [token, load]);
 
     const handleSubmit = async data => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false && !data.id) {
+            const queue = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
+            queue.push(data);
+            localStorage.setItem(OFFLINE_KEY, JSON.stringify(queue));
+            toast('Sin red. El presupuesto queda en el teléfono. No se emite ninguna factura.', 'success');
+            setShowForm(false);
+            return;
+        }
         if (data.id) await updateQuote(token, data.id, data);
         else         await createQuote(token, data);
         setShowForm(false); setEditing(null); load();
+    };
+    const flushOffline = async () => {
+        const queue = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
+        if (!queue.length) return;
+        for (const draft of queue) await createQuote(token, draft);
+        localStorage.removeItem(OFFLINE_KEY);
+        toast('Presupuestos guardados enviados. Siguen siendo borradores.', 'success');
+        load();
+    };
+    const oneTap = async quote => {
+        const today = new Date().toISOString().slice(0, 10);
+        const due = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
+        try {
+            const result = await convertQuote(token, quote.id, { issue_date: today, due_date: due });
+            toast(result.invoice_number
+                ? `Factura ${result.invoice_number} creada.`
+                : 'Borrador de factura creado. El número sale al pulsar Emitir.', 'success');
+            load();
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    const uploadPhoto = async (quote, file) => {
+        if (!file) return;
+        try {
+            const image = await compressPhoto(file);
+            const res = await fetchWithAuth(`${API}/quotes/${quote.id}/photos`, token, {
+                method: 'POST',
+                body: JSON.stringify({ image, caption: 'Foto de la obra' }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'No se guardó la foto');
+            toast('Foto guardada en el presupuesto', 'success');
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    const saveSignature = async () => {
+        try {
+            const res = await fetchWithAuth(`${API}/quotes/${signing.id}/sign`, token, {
+                method: 'POST',
+                body: JSON.stringify({ signerName, signature }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'No se guardó la firma');
+            toast('Firma guardada. El presupuesto queda aceptado.', 'success');
+            setSigning(null);
+            load();
+        } catch (err) { toast(err.message, 'error'); }
+    };
+    const shareWhatsapp = quote => {
+        const link = quote.public_token ? `${window.location.origin}/q/${quote.public_token}` : '';
+        const text = encodeURIComponent(`Hola, te paso el presupuesto ${quote.quote_number} por ${fmt(quote.total_amount)}. ${link}`.trim());
+        window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
     const handleDelete = async () => { await deleteQuote(token, toDelete.id); setToDelete(null); load(); };
     const handleConvert = async () => {
@@ -139,11 +307,14 @@ export default function QuotesTab({ token, clients, projects, services }) {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quotes.length} presupuesto{quotes.length !== 1 ? 's' : ''}</p>
-                <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
-                    <Plus size={14} /> Nuevo presupuesto
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost" onClick={flushOffline}>Enviar guardados</button>
+                    <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
+                        <Plus size={14} /> Nuevo presupuesto
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -166,9 +337,17 @@ export default function QuotesTab({ token, clients, projects, services }) {
                                     <strong style={{ color: 'var(--text-primary)', fontSize: 16 }}>{fmt(q.total_amount)}</strong>
                                 </div>
                                 {!q.converted_to_invoice_id && q.status !== 'rejected' && (
-                                    <button className="btn btn-primary" style={{ width: '100%', minHeight: 48 }} onClick={() => setConverting(q)}>
-                                        <ArrowRight size={16} /> Pasar a factura
-                                    </button>
+                                    <>
+                                        <button className="btn btn-primary" style={{ width: '100%', minHeight: 48 }} onClick={() => oneTap(q)}>
+                                            <ArrowRight size={16} /> Pasar a factura
+                                        </button>
+                                        <button className="btn btn-ghost" style={{ width: '100%', minHeight: 44 }} onClick={() => shareWhatsapp(q)}>WhatsApp</button>
+                                        <button className="btn btn-ghost" style={{ width: '100%', minHeight: 44 }} onClick={() => { setSigning(q); setSignerName(q.client_name || ''); setSignature(''); }}>Firmar aquí</button>
+                                        <label className="btn btn-ghost" style={{ width: '100%', minHeight: 44, textAlign: 'center' }}>
+                                            Foto de la obra
+                                            <input type="file" accept="image/jpeg,image/png" capture="environment" hidden onChange={e => { uploadPhoto(q, e.target.files?.[0]); e.target.value = ''; }} />
+                                        </label>
+                                    </>
                                 )}
                                 {q.converted_to_invoice_id && (
                                     <span style={{ fontSize: 13, color: 'var(--secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -200,12 +379,19 @@ export default function QuotesTab({ token, clients, projects, services }) {
                                         <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(q.total_amount)}</td>
                                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                             {!q.converted_to_invoice_id && q.status !== 'rejected' && (
-                                                <button className="action-link" style={{ color: 'var(--secondary)', marginRight: 4 }}
-                                                    onClick={() => setConverting(q)}
-                                                    title="Convertir a factura">
-                                                    <ArrowRight size={13} style={{ verticalAlign: 'middle' }} /> Facturar
-                                                </button>
+                                                <>
+                                                    <button className="action-link" style={{ color: 'var(--secondary)', marginRight: 4 }} onClick={() => oneTap(q)}>
+                                                        <ArrowRight size={13} style={{ verticalAlign: 'middle' }} /> Pasar a factura
+                                                    </button>
+                                                    <button className="action-link" style={{ marginRight: 4 }} onClick={() => setConverting(q)}>Fechas</button>
+                                                </>
                                             )}
+                                            <button className="action-link" style={{ marginRight: 4 }} onClick={() => shareWhatsapp(q)}>WhatsApp</button>
+                                            <button className="action-link" style={{ marginRight: 4 }} onClick={() => { setSigning(q); setSignerName(q.client_name || ''); setSignature(''); }}>Firmar</button>
+                                            <label className="action-link" style={{ marginRight: 4 }}>
+                                                Foto
+                                                <input type="file" accept="image/jpeg,image/png" hidden onChange={e => { uploadPhoto(q, e.target.files?.[0]); e.target.value = ''; }} />
+                                            </label>
                                             {q.converted_to_invoice_id && (
                                                 <span style={{ fontSize: 11, color: 'var(--secondary)', marginRight: 8, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                                                     <CheckCircle size={11} /> Facturado
@@ -223,7 +409,7 @@ export default function QuotesTab({ token, clients, projects, services }) {
             )}
 
             <Modal open={showForm} size="lg" title={editing ? 'Editar presupuesto' : 'Nuevo presupuesto'} onClose={() => { setShowForm(false); setEditing(null); }}>
-                <QuoteForm clients={clients} projects={projects} services={services} initialData={editing}
+                <QuoteForm token={token} clients={clients} projects={projects} services={services} initialData={editing}
                     onSubmit={handleSubmit} onCancel={() => { setShowForm(false); setEditing(null); }} />
             </Modal>
 
@@ -237,7 +423,18 @@ export default function QuotesTab({ token, clients, projects, services }) {
                 </div>
             </Modal>
 
-            <Modal open={!!converting} title={`Convertir a factura — ${converting?.quote_number}`} onClose={() => setConverting(null)}>
+            <Modal open={!!signing} title={`Firmar — ${signing?.quote_number || ''}`} onClose={() => setSigning(null)}>
+                <form onSubmit={e => { e.preventDefault(); saveSignature(); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <label htmlFor="signer-name">Nombre de quien acepta
+                        <input id="signer-name" className="form-input" value={signerName} onChange={e => setSignerName(e.target.value)} required />
+                    </label>
+                    <p id="sign-help">Firma con el dedo en el recuadro. No crea la factura: eso es el botón de pasar a factura.</p>
+                    <SignaturePad onChange={setSignature} />
+                    <button className="btn btn-primary" type="submit" style={{ minHeight: 48 }}>Guardar firma</button>
+                </form>
+            </Modal>
+
+            <Modal open={!!converting} title={`Elegir fechas — ${converting?.quote_number}`} onClose={() => setConverting(null)}>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
                     Se creará una factura borrador con todas las líneas del presupuesto.
                 </p>

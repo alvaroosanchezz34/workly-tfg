@@ -10,6 +10,7 @@ import {
     getIssuerProfile, saveIssuerProfile, issueInvoice, voidInvoice,
     createRectificativa, getInvoiceEvents,
 } from '../controllers/invoiceCompliance.controller.js';
+import { getInvoiceAging, remindInvoice } from '../controllers/oficio.controller.js';
 import { authenticate }               from '../middlewares/auth.middleware.js';
 import { checkLimit, requireFeature } from '../middlewares/plan.middleware.js';
 
@@ -18,6 +19,8 @@ const router = Router();
 router.get('/',         authenticate, getInvoices);
 router.post('/',        authenticate, checkLimit('invoices'), createInvoice);       // Free: máx 10/mes
 router.get('/stats',    authenticate, requireFeature('stats'), getInvoiceStats);    // Pro+
+router.get('/aging',    authenticate, getInvoiceAging);
+router.post('/:id/remind', authenticate, remindInvoice);
 router.get('/settings', authenticate, getInvoiceSettings);
 router.put('/settings', authenticate, updateInvoiceSettings);
 router.get('/issuer', authenticate, getIssuerProfile);

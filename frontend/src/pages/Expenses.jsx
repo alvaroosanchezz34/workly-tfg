@@ -20,6 +20,8 @@ const fmt     = v => new Intl.NumberFormat('es-ES', { style: 'currency', currenc
 const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 const CAT_COLOR = {
+    materiales: { bg: 'var(--secondary-light)', color: 'var(--secondary)' },
+    gasolina:   { bg: 'var(--warning-light)',   color: 'var(--warning)'   },
     software:   { bg: 'var(--primary-light)',   color: 'var(--primary)'   },
     hardware:   { bg: '#F3E5F5',                color: '#7B1FA2'          },
     oficina:    { bg: 'var(--secondary-light)', color: 'var(--secondary)' },
@@ -30,6 +32,7 @@ const CAT_COLOR = {
     otros:      { bg: '#F5F5F5',               color: '#616161'          },
 };
 const CAT_LABELS = {
+    materiales: 'Materiales', gasolina: 'Gasolina',
     software: 'Software', hardware: 'Hardware', oficina: 'Oficina',
     transporte: 'Transporte', marketing: 'Marketing', formacion: 'Formación',
     servicios: 'Servicios', otros: 'Otros',
